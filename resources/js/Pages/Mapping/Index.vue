@@ -609,10 +609,6 @@ const submitImportForm = () => {
                     <template #cell-area_name="{ row }">
                         <span class="font-medium text-slate-800">
                             {{ row.area_name }}
-
-                            <span class="text-slate-400 font-mono text-[10px]">
-                                ({{ row.area_code }})
-                            </span>
                         </span>
                     </template>
 
@@ -624,10 +620,6 @@ const submitImportForm = () => {
                             class="font-medium text-slate-800"
                         >
                             {{ row.machine_name }}
-
-                            <span class="text-slate-400 font-mono text-[10px]">
-                                ({{ row.machine_code }})
-                            </span>
                         </span>
 
                         <span

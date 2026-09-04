@@ -237,7 +237,6 @@ const doDelete = () => {
                 <template #cell-area="{ row }">
                     <span v-if="row.area">
                         {{ row.area?.name }}
-                        <span class="text-xs text-gray-400">({{ row.area?.code }})</span>
                     </span>
                     <span v-else class="text-slate-400 italic text-xs">Tanpa Area</span>
                 </template>
