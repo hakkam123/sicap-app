@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Imports\ConsumeImport;
+use App\Models\Area;
 use App\Models\Consume;
 use App\Models\ImportLog;
+use App\Models\Machine;
 use App\Models\PartNumber;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -65,6 +67,8 @@ class ImportConsumeJob implements ShouldQueue
 
             DB::transaction(function () use ($rows, &$errors, &$processedCount) {
                 $partCache = [];
+                $areaCache = [];
+                $machineCache = [];
 
                 foreach ($rows as $index => $row) {
                     $rowNumber = $index + 2; // +1 for 0-index, +1 for header row
@@ -99,6 +103,47 @@ class ImportConsumeJob implements ShouldQueue
                         $errors[] = "Baris {$rowNumber}: Part Number '{$pnBaan}' tidak ditemukan di master data.";
                     }
 
+                    // Optional Area Code
+                    $rawAreaCode = $normalizedRow['areacode'] ?? $normalizedRow['area'] ?? null;
+                    $areaCode = $rawAreaCode !== null && trim((string) $rawAreaCode) !== '' ? trim((string) $rawAreaCode) : null;
+                    $areaId = null;
+
+                    if ($areaCode !== null) {
+                        if (!array_key_exists($areaCode, $areaCache)) {
+                            $areaCache[$areaCode] = Area::where('code', $areaCode)->whereNull('deleted_at')->first();
+                        }
+                        $area = $areaCache[$areaCode];
+                        if (!$area) {
+                            $errors[] = "Baris {$rowNumber}: Area code '{$areaCode}' tidak ditemukan.";
+                        } else {
+                            $areaId = $area->id;
+                        }
+                    }
+
+                    // Optional Machine Code
+                    $rawMachineCode = $normalizedRow['machinecode'] ?? $normalizedRow['machine'] ?? null;
+                    $machineCode = $rawMachineCode !== null && trim((string) $rawMachineCode) !== '' ? trim((string) $rawMachineCode) : null;
+                    $machineId = null;
+
+                    if ($machineCode !== null) {
+                        if (!array_key_exists($machineCode, $machineCache)) {
+                            $machineCache[$machineCode] = Machine::where('code', $machineCode)->whereNull('deleted_at')->first();
+                        }
+                        $machine = $machineCache[$machineCode];
+                        if (!$machine) {
+                            $errors[] = "Baris {$rowNumber}: Machine code '{$machineCode}' tidak ditemukan.";
+                        } else {
+                            if ($areaId && $machine->area_id !== $areaId) {
+                                $errors[] = "Baris {$rowNumber}: Machine '{$machineCode}' tidak berada di area '{$areaCode}'.";
+                            } else {
+                                $machineId = $machine->id;
+                                if (!$areaId && $machine->area_id) {
+                                    $areaId = $machine->area_id;
+                                }
+                            }
+                        }
+                    }
+
                     // Parse Date
                     $rawDate = $normalizedRow['date'] ?? null;
                     $consumedAt = $this->parseIndonesianDate($rawDate);
@@ -126,8 +171,8 @@ class ImportConsumeJob implements ShouldQueue
 
                     Consume::create([
                         'part_number_id' => $part->id,
-                        'area_id' => null,
-                        'machine_id' => null,
+                        'area_id' => $areaId,
+                        'machine_id' => $machineId,
                         'quantity' => $quantity,
                         'amount' => $amount,
                         'consumed_at' => $consumedAt,

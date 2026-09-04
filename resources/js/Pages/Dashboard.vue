@@ -237,7 +237,8 @@ const barChartConfig = computed(() => ({
             {
                 label: 'Total Qty Terpakai',
                 data: props.byArea.map((a) => Math.abs(a.total_qty)),
-                backgroundColor: props.byArea.map((_, i) => {
+                backgroundColor: props.byArea.map((a, i) => {
+                    if (!a.area_id) return 'rgba(148,163,184,0.8)'; // gray for unassigned
                     const colors = [
                         'rgba(37,99,235,0.8)',   // blue
                         'rgba(16,185,129,0.8)',  // green
@@ -250,12 +251,19 @@ const barChartConfig = computed(() => ({
                 }),
                 borderRadius: 6,
                 borderSkipped: false,
+                maxBarThickness: 28,
             },
         ],
     },
     options: {
+        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            axis: 'y',
+            intersect: false,
+        },
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -272,11 +280,20 @@ const barChartConfig = computed(() => ({
             },
         },
         scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-            y: {
+            x: {
                 beginAtZero: true,
                 grid: { color: 'rgba(226,232,240,0.8)' },
-                ticks: { font: { size: 11 } },
+                ticks: {
+                    font: { size: 10 },
+                    precision: 0,
+                },
+            },
+            y: {
+                grid: { display: false },
+                ticks: {
+                    autoSkip: false,
+                    font: { size: 10 },
+                },
             },
         },
         onClick: (event, elements) => {
@@ -303,6 +320,8 @@ const drillDown = ref({
 });
 
 const openAreaDrillDown = async (area) => {
+    const type = area.area_id ? 'area' : 'unassigned';
+    const id = area.area_id ?? 'null';
     drillDown.value = {
         show: true,
         loading: true,
@@ -311,7 +330,7 @@ const openAreaDrillDown = async (area) => {
         total_qty: 0,
         total_amount: 0,
     };
-    await fetchDrillDown('area', area.area_id);
+    await fetchDrillDown(type, id);
 };
 
 const openPartDrillDown = async (item) => {
@@ -585,62 +604,65 @@ const sortedTopConsumes = computed(() => {
         </div>
 
 
-            <!-- 3. Line Chart (Facing Upwards) -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-800">
-                            Tren Konsumsi Harian
-                        </h3>
-                        <p class="text-xs text-slate-400 mt-0.5">
-                            Pergerakan kuantitas sparepart terpakai per tanggal (grafik menghadap ke atas).
-                        </p>
+            <!-- 3 & 4. Charts: Tren Harian (2/3) & Konsumsi per Area (1/3) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- Line chart: col-span-2 (2/3 lebar) -->
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800">
+                                Tren Konsumsi Harian
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-0.5">
+                                Pergerakan kuantitas sparepart terpakai per tanggal (grafik menghadap ke atas).
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="h-64 w-full">
+                        <Line
+                            v-if="chartData.length > 0"
+                            :data="chartConfig.data"
+                            :options="chartConfig.options"
+                        />
+                        <div
+                            v-else
+                            class="h-full flex flex-col items-center justify-center text-slate-400 text-xs"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                            </svg>
+                            Tidak ada data konsumsi pada rentang filter ini.
+                        </div>
                     </div>
                 </div>
 
-                <div class="h-72 w-full">
-                    <Line
-                        v-if="chartData.length > 0"
-                        :data="chartConfig.data"
-                        :options="chartConfig.options"
-                    />
-                    <div
-                        v-else
-                        class="h-full flex flex-col items-center justify-center text-slate-400 text-xs"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                        </svg>
-                        Tidak ada data konsumsi pada rentang filter ini.
+                <!-- Bar chart: col-span-1 (1/3 lebar) -->
+                <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800">Konsumsi per Area</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">
+                                Klik bar untuk detail.
+                            </p>
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- 4. Bar Chart: Konsumsi per Area -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-800">Perbandingan Konsumsi per Area</h3>
-                        <p class="text-xs text-slate-400 mt-0.5">
-                            Klik bar untuk melihat detail konsumsi di area tersebut.
-                        </p>
-                    </div>
-                </div>
-                <div class="h-64 w-full">
-                    <Bar
-                        v-if="byArea && byArea.length > 0"
-                        :data="barChartConfig.data"
-                        :options="barChartConfig.options"
-                        ref="barChartRef"
-                    />
-                    <div
-                        v-else
-                        class="h-full flex flex-col items-center justify-center text-slate-400 text-xs"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                        </svg>
-                        Tidak ada data area pada filter ini.
+                    <div class="h-64 w-full">
+                        <Bar
+                            v-if="byArea && byArea.length > 0"
+                            :data="barChartConfig.data"
+                            :options="barChartConfig.options"
+                            ref="barChartRef"
+                        />
+                        <div
+                            v-else
+                            class="h-full flex flex-col items-center justify-center text-slate-400 text-xs"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                            </svg>
+                            Tidak ada data area pada filter ini.
+                        </div>
                     </div>
                 </div>
             </div>

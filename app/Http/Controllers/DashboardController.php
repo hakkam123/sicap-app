@@ -84,25 +84,26 @@ class DashboardController extends Controller
                 ];
             });
 
-        // 4. Consumption by Area within filter period
-        $byArea = Consume::query()
-            ->join('areas', 'consumes.area_id', '=', 'areas.id')
-            ->when($areaId, fn($q) => $q->where('consumes.area_id', $areaId))
-            ->when($machineId, fn($q) => $q->where('consumes.machine_id', $machineId))
-            ->when($dateFrom, fn($q) => $q->whereDate('consumes.consumed_at', '>=', $dateFrom))
-            ->when($dateTo, fn($q) => $q->whereDate('consumes.consumed_at', '<=', $dateTo))
-            ->whereNotNull('consumes.area_id')
+        // 4. Consumption by Area within filter period (Always include ALL active areas)
+        $byArea = DB::table('areas')
+            ->leftJoin('consumes', function ($join) use ($machineId, $dateFrom, $dateTo) {
+                $join->on('consumes.area_id', '=', 'areas.id')
+                    ->when($machineId, fn($j) => $j->where('consumes.machine_id', $machineId))
+                    ->when($dateFrom, fn($j) => $j->whereDate('consumes.consumed_at', '>=', $dateFrom))
+                    ->when($dateTo, fn($j) => $j->whereDate('consumes.consumed_at', '<=', $dateTo));
+            })
             ->whereNull('areas.deleted_at')
-            ->groupBy('consumes.area_id', 'areas.name', 'areas.code')
+            ->groupBy('areas.id', 'areas.name', 'areas.code')
             ->select([
-                'consumes.area_id',
+                'areas.id as area_id',
                 'areas.name as area_name',
                 'areas.code as area_code',
-                DB::raw('SUM(ABS(quantity)) as total_qty'),
-                DB::raw('SUM(ABS(amount)) as total_amount'),
-                DB::raw('COUNT(*) as total_count'),
+                DB::raw('COALESCE(SUM(ABS(consumes.quantity)), 0) as total_qty'),
+                DB::raw('COALESCE(SUM(ABS(consumes.amount)), 0) as total_amount'),
+                DB::raw('COUNT(consumes.id) as total_count'),
             ])
             ->orderByDesc('total_qty')
+            ->orderBy('areas.name', 'asc')
             ->get()
             ->map(function ($item) {
                 return [
@@ -114,6 +115,28 @@ class DashboardController extends Controller
                     'total_count' => (int) $item->total_count,
                 ];
             });
+
+        // Data consume tanpa area (NULL)
+        $unassignedQty = Consume::whereNull('area_id')
+            ->when($machineId, fn($q) => $q->where('machine_id', $machineId))
+            ->when($dateFrom, fn($q) => $q->whereDate('consumed_at', '>=', $dateFrom))
+            ->when($dateTo, fn($q) => $q->whereDate('consumed_at', '<=', $dateTo))
+            ->selectRaw('SUM(ABS(quantity)) as total_qty, SUM(ABS(amount)) as total_amount, COUNT(*) as total_count')
+            ->first();
+
+        // Append ke collection byArea jika ada data unassigned
+        if ($unassignedQty && $unassignedQty->total_count > 0) {
+            $byArea->push([
+                'area_id'      => null,
+                'area_name'    => 'Tidak Diketahui',
+                'area_code'    => '—',
+                'total_qty'    => (int) abs($unassignedQty->total_qty ?? 0),
+                'total_amount' => (float) abs($unassignedQty->total_amount ?? 0),
+                'total_count'  => (int) ($unassignedQty->total_count ?? 0),
+            ]);
+            // Re-sort by total_qty desc
+            $byArea = $byArea->sortByDesc('total_qty')->values();
+        }
 
         // 5. Filter dropdowns data
         $areas = Area::select('id', 'code', 'name')->orderBy('name')->get();
@@ -143,7 +166,7 @@ class DashboardController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'type'      => 'required|in:area,part',
+            'type'      => 'required|in:area,part,unassigned',
             'id'        => 'required|string',
             'date_from' => 'nullable|date',
             'date_to'   => 'nullable|date',
@@ -153,7 +176,10 @@ class DashboardController extends Controller
             ->when($request->date_from, fn($q) => $q->whereDate('consumed_at', '>=', $request->date_from))
             ->when($request->date_to,   fn($q) => $q->whereDate('consumed_at', '<=', $request->date_to));
 
-        if ($request->type === 'area') {
+        if ($request->type === 'unassigned') {
+            $query->whereNull('area_id');
+            $title = 'Consume Tanpa Area (Unassigned)';
+        } elseif ($request->type === 'area') {
             $query->where('area_id', $request->id);
             $title = Area::find($request->id)?->name ?? 'Area';
         } else {
