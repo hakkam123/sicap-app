@@ -20,6 +20,9 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    // Dashboard Drill-Down
+    Route::get('/dashboard/drill-down', [DashboardController::class, 'drillDown'])->name('dashboard.drill-down');
+
     // Consume Unified & Actions
     Route::get('/consume', [ConsumeController::class, 'index'])->name('consume.index');
     Route::post('/consume', [ConsumeController::class, 'store'])->name('consume.store');

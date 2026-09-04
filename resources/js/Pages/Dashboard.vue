@@ -4,6 +4,7 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import { X as XMarkIcon } from 'lucide-vue-next';
 
 // Chart.js & vue-chartjs integration
 import {
@@ -12,18 +13,20 @@ import {
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
     Filler,
 } from 'chart.js';
-import { Line } from 'vue-chartjs';
+import { Line, Bar } from 'vue-chartjs';
 
 ChartJS.register(
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
@@ -40,6 +43,10 @@ const props = defineProps({
         default: () => [],
     },
     topConsumes: {
+        type: Array,
+        default: () => [],
+    },
+    byArea: {
         type: Array,
         default: () => [],
     },
@@ -218,6 +225,146 @@ const chartConfig = computed(() => {
             },
         },
     };
+});
+
+// Bar Chart: Perbandingan Konsumsi per Area
+const barChartRef = ref(null);
+
+const barChartConfig = computed(() => ({
+    data: {
+        labels: props.byArea.map((a) => a.area_code || a.area_name),
+        datasets: [
+            {
+                label: 'Total Qty Terpakai',
+                data: props.byArea.map((a) => Math.abs(a.total_qty)),
+                backgroundColor: props.byArea.map((_, i) => {
+                    const colors = [
+                        'rgba(37,99,235,0.8)',   // blue
+                        'rgba(16,185,129,0.8)',  // green
+                        'rgba(245,158,11,0.8)',  // amber
+                        'rgba(239,68,68,0.8)',   // red
+                        'rgba(139,92,246,0.8)',  // purple
+                        'rgba(20,184,166,0.8)',  // teal
+                    ];
+                    return colors[i % colors.length];
+                }),
+                borderRadius: 6,
+                borderSkipped: false,
+            },
+        ],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => {
+                        const item = props.byArea[ctx.dataIndex];
+                        return [
+                            `Qty: ${formatNumber(item.total_qty)}`,
+                            `Nominal: ${formatRupiah(item.total_amount)}`,
+                            `Frekuensi: ${item.total_count} transaksi`,
+                        ];
+                    },
+                },
+            },
+        },
+        scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(226,232,240,0.8)' },
+                ticks: { font: { size: 11 } },
+            },
+        },
+        onClick: (event, elements) => {
+            if (elements.length > 0) {
+                const idx = elements[0].index;
+                const area = props.byArea[idx];
+                openAreaDrillDown(area);
+            }
+        },
+        onHover: (event, elements) => {
+            event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+        },
+    },
+}));
+
+// Drill-down State & Actions
+const drillDown = ref({
+    show: false,
+    loading: false,
+    title: '',
+    rows: [],
+    total_qty: 0,
+    total_amount: 0,
+});
+
+const openAreaDrillDown = async (area) => {
+    drillDown.value = {
+        show: true,
+        loading: true,
+        title: area.area_name || area.area_code,
+        rows: [],
+        total_qty: 0,
+        total_amount: 0,
+    };
+    await fetchDrillDown('area', area.area_id);
+};
+
+const openPartDrillDown = async (item) => {
+    drillDown.value = {
+        show: true,
+        loading: true,
+        title: item.pn_baan,
+        rows: [],
+        total_qty: 0,
+        total_amount: 0,
+    };
+    await fetchDrillDown('part', item.part_number_id);
+};
+
+const fetchDrillDown = async (type, id) => {
+    try {
+        const params = new URLSearchParams({
+            type,
+            id,
+            ...(filterForm.value.date_from && { date_from: filterForm.value.date_from }),
+            ...(filterForm.value.date_to && { date_to: filterForm.value.date_to }),
+        });
+        const res = await fetch(`/dashboard/drill-down?${params}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+            },
+        });
+        const data = await res.json();
+        drillDown.value = { ...drillDown.value, loading: false, ...data };
+    } catch {
+        drillDown.value.loading = false;
+    }
+};
+
+const closeDrillDown = () => {
+    drillDown.value.show = false;
+};
+
+// Top 10 Consume Sort
+const topConsumeSort = ref('desc');
+
+const sortedTopConsumes = computed(() => {
+    const data = [...(props.topConsumes || [])];
+
+    return data.sort((a, b) => {
+        const qtyA = Number(a.total_qty || 0);
+        const qtyB = Number(b.total_qty || 0);
+
+        return topConsumeSort.value === 'asc'
+            ? qtyA - qtyB
+            : qtyB - qtyA;
+    });
 });
 </script>
 
@@ -469,78 +616,381 @@ const chartConfig = computed(() => {
                 </div>
             </div>
 
-            <!-- 4. Top 10 Consume per Part Number (Positive Qty) -->
+            <!-- 4. Bar Chart: Konsumsi per Area -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <div class="mb-4">
-                    <h3 class="text-sm font-bold text-slate-800">
-                        Top 10 Konsumsi Terbanyak per Part Number
-                    </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">
-                        Daftar sparepart dengan jumlah pemakaian (kuantitas unit) paling tinggi.
-                    </p>
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">Perbandingan Konsumsi per Area</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            Klik bar untuk melihat detail konsumsi di area tersebut.
+                        </p>
+                    </div>
+                </div>
+                <div class="h-64 w-full">
+                    <Bar
+                        v-if="byArea && byArea.length > 0"
+                        :data="barChartConfig.data"
+                        :options="barChartConfig.options"
+                        ref="barChartRef"
+                    />
+                    <div
+                        v-else
+                        class="h-full flex flex-col items-center justify-center text-slate-400 text-xs"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                        </svg>
+                        Tidak ada data area pada filter ini.
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Top 10 Konsumsi per Part Number -->
+            <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                <!-- Header -->
+                <div class="px-5 py-4 border-b border-slate-200">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">
+                                Top 10 Konsumsi per Part Number
+                            </h3>
+                            <p class="text-[11px] text-slate-400 mt-1">
+                                Berdasarkan total kuantitas sparepart yang terpakai.
+                            </p>
+                        </div>
+
+                        <!-- Sort Control -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-[11px] font-medium text-slate-400">
+                                Urutkan Qty
+                            </span>
+
+                            <div class="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+                                <button
+                                    type="button"
+                                    @click="topConsumeSort = 'desc'"
+                                    :class="[
+                                        'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[11px] font-semibold transition-colors',
+                                        topConsumeSort === 'desc'
+                                            ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    ]"
+                                    title="Quantity terbesar ke terkecil"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        class="w-3.5 h-3.5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            d="M3 7h18M3 12h12M3 17h6"
+                                        />
+                                    </svg>
+                                    Terbesar
+                                </button>
+
+                                <button
+                                    type="button"
+                                    @click="topConsumeSort = 'asc'"
+                                    :class="[
+                                        'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[11px] font-semibold transition-colors',
+                                        topConsumeSort === 'asc'
+                                            ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    ]"
+                                    title="Quantity terkecil ke terbesar"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        class="w-3.5 h-3.5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            d="M3 7h6M3 12h12M3 17h18"
+                                        />
+                                    </svg>
+                                    Terkecil
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
+                <!-- Table -->
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-12">
-                                    No
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="border-b border-slate-200 bg-slate-50/70">
+                                <th
+                                    scope="col"
+                                    class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider w-14"
+                                >
+                                    #
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    PN BAAN
+
+                                <th
+                                    scope="col"
+                                    class="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider"
+                                >
+                                    Part Number
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+
+                                <th
+                                    scope="col"
+                                    class="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider"
+                                >
                                     Deskripsi
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+
+                                <th
+                                    scope="col"
+                                    class="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider"
+                                >
                                     Frekuensi
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    Total Qty Terpakai
+
+                                <th
+                                    scope="col"
+                                    class="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider"
+                                >
+                                    Qty
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    Total Nominal (Rp)
+
+                                <th
+                                    scope="col"
+                                    class="px-5 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider"
+                                >
+                                    Nilai Pemakaian
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-slate-200">
-                            <tr v-if="topConsumes.length === 0">
-                                <td colspan="6" class="px-4 py-6 text-center text-slate-400 text-xs">
-                                    Tidak ada data peringkat konsumsi pada filter ini.
+
+                        <tbody class="divide-y divide-slate-100">
+                            <!-- Empty -->
+                            <tr v-if="sortedTopConsumes.length === 0">
+                                <td
+                                    colspan="6"
+                                    class="px-5 py-12 text-center"
+                                >
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center mb-2">
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                class="w-4 h-4 text-slate-400"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                stroke-width="1.7"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                                                />
+                                            </svg>
+                                        </div>
+
+                                        <p class="text-xs font-medium text-slate-500">
+                                            Tidak ada data konsumsi
+                                        </p>
+
+                                        <p class="text-[11px] text-slate-400 mt-0.5">
+                                            Coba ubah periode atau filter yang digunakan.
+                                        </p>
+                                    </div>
                                 </td>
                             </tr>
+
+                            <!-- Rows -->
                             <tr
-                                v-for="(item, idx) in topConsumes"
+                                v-for="(item, idx) in sortedTopConsumes"
                                 :key="item.part_number_id"
-                                class="hover:bg-slate-50 transition-colors"
+                                @click="openPartDrillDown(item)"
+                                class="group hover:bg-slate-50/70 transition-colors cursor-pointer"
+                                title="Klik untuk lihat detail"
                             >
-                                <td class="px-4 py-3 text-xs text-slate-500 font-medium">
-                                    {{ idx + 1 }}
+                                <!-- Ranking -->
+                                <td class="px-5 py-3">
+                                    <span
+                                        :class="[
+                                            'inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold',
+                                            idx === 0
+                                                ? 'bg-slate-900 text-white'
+                                                : idx === 1
+                                                    ? 'bg-slate-200 text-slate-700'
+                                                    : idx === 2
+                                                        ? 'bg-slate-100 text-slate-600'
+                                                        : 'text-slate-400'
+                                        ]"
+                                    >
+                                        {{ idx + 1 }}
+                                    </span>
                                 </td>
-                                <td class="px-4 py-3 text-xs font-bold text-blue-700 font-mono">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200">
+
+                                <!-- PN -->
+                                <td class="px-4 py-3">
+                                    <span class="font-mono text-xs font-semibold text-slate-800">
                                         {{ item.pn_baan }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-xs text-slate-700 max-w-sm truncate" :title="item.description">
-                                    {{ item.description }}
+
+                                <!-- Description -->
+                                <td
+                                    class="px-4 py-3 max-w-sm"
+                                    :title="item.description"
+                                >
+                                    <span class="block truncate text-xs text-slate-600">
+                                        {{ item.description || '-' }}
+                                    </span>
                                 </td>
-                                <td class="px-4 py-3 text-xs text-center text-slate-600 font-medium">
-                                    {{ item.count }} kali
+
+                                <!-- Frequency -->
+                                <td class="px-4 py-3 text-center">
+                                    <span class="text-xs text-slate-500">
+                                        {{ formatNumber(item.count) }}
+                                        <span class="text-slate-400">×</span>
+                                    </span>
                                 </td>
-                                <td class="px-4 py-3 text-xs text-right font-bold text-slate-900">
-                                    {{ formatNumber(item.total_qty) }}
+
+                                <!-- Quantity -->
+                                <td class="px-4 py-3 text-right">
+                                    <span class="text-sm font-bold text-slate-900 tabular-nums">
+                                        {{ formatNumber(item.total_qty) }}
+                                    </span>
                                 </td>
-                                <td class="px-4 py-3 text-xs text-right font-semibold text-slate-800 whitespace-nowrap">
-                                    {{ formatRupiah(item.total_amount) }}
+
+                                <!-- Amount -->
+                                <td class="px-5 py-3 text-right whitespace-nowrap">
+                                    <span class="text-xs font-semibold text-slate-700 tabular-nums">
+                                        {{ formatRupiah(item.total_amount) }}
+                                    </span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Footer -->
+                <div
+                    v-if="sortedTopConsumes.length > 0"
+                    class="px-5 py-3 border-t border-slate-100 bg-slate-50/40"
+                >
+                    <p class="text-[10px] text-slate-400">
+                        Menampilkan {{ sortedTopConsumes.length }} part dengan konsumsi tertinggi
+                        berdasarkan filter yang dipilih.
+                    </p>
+                </div>
             </div>
 
         </div>
+
+        <!-- Drill-down Modal -->
+        <Teleport to="body">
+            <div
+                v-if="drillDown.show"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                @click.self="closeDrillDown"
+            >
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeDrillDown" />
+
+                <!-- Modal -->
+                <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800">Detail Konsumsi</h3>
+                            <p class="text-xs text-slate-500 mt-0.5 font-mono">{{ drillDown.title }}</p>
+                        </div>
+                        <button
+                            @click="closeDrillDown"
+                            class="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+                        >
+                            <XMarkIcon class="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="px-6 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-6">
+                        <div>
+                            <span class="text-xs text-slate-500">Total Qty:</span>
+                            <span class="text-xs font-bold text-slate-900 ml-1">{{ formatNumber(drillDown.total_qty) }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-500">Total Nominal:</span>
+                            <span class="text-xs font-bold text-slate-900 ml-1">{{ formatRupiah(drillDown.total_amount) }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-500">Menampilkan maks. 50 transaksi terbaru</span>
+                        </div>
+                    </div>
+
+                    <!-- Loading -->
+                    <div v-if="drillDown.loading" class="flex-1 flex items-center justify-center py-12">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+                    </div>
+
+                    <!-- Table -->
+                    <div v-else class="flex-1 overflow-auto">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Tanggal</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">PN BAAN</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Deskripsi</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Area</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Machine</th>
+                                    <th class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Qty</th>
+                                    <th class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Nominal</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Source</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-if="drillDown.rows.length === 0">
+                                    <td colspan="8" class="px-4 py-8 text-center text-xs text-slate-400">
+                                        Tidak ada data transaksi.
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-for="(row, i) in drillDown.rows"
+                                    :key="i"
+                                    class="hover:bg-slate-50 transition-colors"
+                                >
+                                    <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{{ row.date }}</td>
+                                    <td class="px-4 py-3 text-xs font-mono font-bold text-blue-700">{{ row.pn_baan }}</td>
+                                    <td class="px-4 py-3 text-xs text-slate-700 max-w-xs truncate" :title="row.description">{{ row.description }}</td>
+                                    <td class="px-4 py-3 text-xs text-slate-600">{{ row.area ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-xs text-slate-600">{{ row.machine ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-xs text-right font-bold text-slate-900">{{ formatNumber(row.qty) }}</td>
+                                    <td class="px-4 py-3 text-xs text-right text-slate-700 whitespace-nowrap">{{ formatRupiah(row.amount) }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span
+                                            :class="{
+                                                'bg-green-100 text-green-800': row.source === 'manual',
+                                                'bg-blue-100 text-blue-800': row.source === 'import_excel',
+                                                'bg-purple-100 text-purple-800': row.source === 'api',
+                                            }"
+                                            class="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
+                                        >
+                                            {{ row.source === 'import_excel' ? 'Import' : row.source === 'api' ? 'API Sync' : 'Manual' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>

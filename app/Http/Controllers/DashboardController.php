@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Area;
 use App\Models\Consume;
 use App\Models\Machine;
+use App\Models\PartNumber;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -81,7 +84,38 @@ class DashboardController extends Controller
                 ];
             });
 
-        // 4. Filter dropdowns data
+        // 4. Consumption by Area within filter period
+        $byArea = Consume::query()
+            ->join('areas', 'consumes.area_id', '=', 'areas.id')
+            ->when($areaId, fn($q) => $q->where('consumes.area_id', $areaId))
+            ->when($machineId, fn($q) => $q->where('consumes.machine_id', $machineId))
+            ->when($dateFrom, fn($q) => $q->whereDate('consumes.consumed_at', '>=', $dateFrom))
+            ->when($dateTo, fn($q) => $q->whereDate('consumes.consumed_at', '<=', $dateTo))
+            ->whereNotNull('consumes.area_id')
+            ->whereNull('areas.deleted_at')
+            ->groupBy('consumes.area_id', 'areas.name', 'areas.code')
+            ->select([
+                'consumes.area_id',
+                'areas.name as area_name',
+                'areas.code as area_code',
+                DB::raw('SUM(ABS(quantity)) as total_qty'),
+                DB::raw('SUM(ABS(amount)) as total_amount'),
+                DB::raw('COUNT(*) as total_count'),
+            ])
+            ->orderByDesc('total_qty')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'area_id' => $item->area_id,
+                    'area_name' => $item->area_name,
+                    'area_code' => $item->area_code,
+                    'total_qty' => (int) abs($item->total_qty),
+                    'total_amount' => (float) abs($item->total_amount),
+                    'total_count' => (int) $item->total_count,
+                ];
+            });
+
+        // 5. Filter dropdowns data
         $areas = Area::select('id', 'code', 'name')->orderBy('name')->get();
         $machines = $areaId
             ? Machine::where('area_id', $areaId)->select('id', 'code', 'name')->orderBy('name')->get()
@@ -91,6 +125,7 @@ class DashboardController extends Controller
             'summary' => $summary,
             'chartData' => $chartData,
             'topConsumes' => $topConsumes,
+            'byArea' => $byArea,
             'areas' => $areas,
             'machines' => $machines,
             'filters' => [
@@ -99,6 +134,51 @@ class DashboardController extends Controller
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
+        ]);
+    }
+
+    /**
+     * Get drill-down transactions detail for a specific area or part number.
+     */
+    public function drillDown(Request $request): JsonResponse
+    {
+        $request->validate([
+            'type'      => 'required|in:area,part',
+            'id'        => 'required|string',
+            'date_from' => 'nullable|date',
+            'date_to'   => 'nullable|date',
+        ]);
+
+        $query = Consume::with(['partNumber', 'area', 'machine', 'creator'])
+            ->when($request->date_from, fn($q) => $q->whereDate('consumed_at', '>=', $request->date_from))
+            ->when($request->date_to,   fn($q) => $q->whereDate('consumed_at', '<=', $request->date_to));
+
+        if ($request->type === 'area') {
+            $query->where('area_id', $request->id);
+            $title = Area::find($request->id)?->name ?? 'Area';
+        } else {
+            $query->where('part_number_id', $request->id);
+            $pn = PartNumber::find($request->id);
+            $title = $pn ? "{$pn->pn_baan} — {$pn->description}" : 'Part Number';
+        }
+
+        $rows = $query->orderByDesc('consumed_at')->limit(50)->get()->map(fn($c) => [
+            'date'        => $c->consumed_at?->format('d M Y'),
+            'pn_baan'     => $c->partNumber?->pn_baan,
+            'description' => $c->partNumber?->description,
+            'area'        => $c->area?->name,
+            'machine'     => $c->machine?->name,
+            'qty'         => abs($c->quantity),
+            'amount'      => abs($c->amount ?? 0),
+            'source'      => $c->source,
+            'input_by'    => $c->creator?->name ?? '-',
+        ]);
+
+        return response()->json([
+            'title'        => $title,
+            'rows'         => $rows,
+            'total_qty'    => $rows->sum('qty'),
+            'total_amount' => $rows->sum('amount'),
         ]);
     }
 }
