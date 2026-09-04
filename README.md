@@ -1,58 +1,166 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SICAP (Sistem Informasi Consume Sparepart)
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <strong>Aplikasi Manajemen Pemakaian dan Pemetaan Sparepart Mesin</strong><br>
+  PT Astra Visteon Indonesia
 </p>
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 📌 Tentang Proyek
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+**SICAP (Sistem Informasi Consume Sparepart)** adalah aplikasi berbasis web yang dirancang untuk mengelola, memonitor, dan merekapitulasi penggunaan (*consume*) sparepart mesin pada setiap area produksi secara akurat dan terintegrasi. 
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Aplikasi ini memudahkan tim operasional dan maintenance dalam mencatat transaksi pemakaian sparepart, memetakan part number ke area/mesin tertentu, serta menyajikan data analitik biaya pemakaian sparepart secara real-time.
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 🚀 Tech Stack
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Backend
+- **Framework**: [Laravel 11](https://laravel.com/) (PHP 8.3+)
+- **Database**: Microsoft SQL Server / MySQL
+- **Authentication & RBAC**: Laravel Breeze + [Spatie Laravel Permission](https://spatie.be/docs/laravel-permission)
+- **Excel Processing**: [Maatwebsite Excel 4.0](https://laravel-excel.com/)
+- **API Glue**: [Inertia.js v2 (Laravel Adapter)](https://inertiajs.com/)
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### Frontend
+- **Framework**: [Vue 3](https://vuejs.org/) (Composition API with `<script setup>`)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Icons**: [Lucide Vue Next](https://lucide.dev/)
+- **Charts / Visualisasi**: [Chart.js](https://www.chartjs.org/) & [vue-chartjs](https://vue-chartjs.org/)
+- **Build Tool**: [Vite](https://vitejs.dev/)
 
-## Agentic Development
+---
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## ✨ Fitur Utama
 
-```bash
-composer require laravel/boost --dev
+### 1. 📊 Dashboard & Monitoring
+- Ringkasan metrik utama: total transaksi consume, total biaya (amount IDR), dan part teraktif.
+- Grafik visualisasi tren pemakaian sparepart berkala.
 
-php artisan boost:install
+### 2. ⚙️ Master Data Management
+- **Area Management**: CRUD data area/lini produksi, kode area, dan rekapitulasi jumlah mesin terkait.
+- **Machine Management**: CRUD data mesin operasional terikat ke masing-masing area.
+- **Part Number Management**: CRUD katalog part number (PN BAAN), deskripsi, dan harga per unit (IDR) dengan counter relasi area/mesin.
+
+### 3. 🔗 Mapping Part Number
+- **Tampilan Dual-Tab**:
+  - *Data Mapping*: Tabel relasi pivot aktual antara part, area, dan mesin operasional.
+  - *Daftar Part*: Manajemen assignment langsung part number ke banyak area dan mesin sekaligus via modal interaktif.
+- **Import & Template Excel**: Fasilitas unduh template dan import massal mapping part via berkas spreadsheet.
+
+### 4. 📦 Consume Sparepart (Transaksi Pemakaian)
+- **Pencatatan Transaksi**: Input pemakaian sparepart harian secara manual atau melalui batch import file Excel.
+- **Kalkulasi Otomatis**: Perhitungan otomatis nilai biaya (*amount*) berdasarkan kuantitas dan harga satuan part.
+- **Filter Komprehensif**: Filter pencarian teks (PN/nama part), dropdown area, dropdown mesin dinamis berbasis area terpilih, dan rentang tanggal (*Date From - Date To*).
+- **Import Logs**: Riwayat dan audit log proses import file transaksi consume.
+
+### 5. 👥 User Management & Autentikasi
+- Pengelolaan pengguna sistem, pergantian password, dan penetapan role (*Admin* vs *User*).
+- Hak akses granular untuk operasi CRUD dan import data.
+
+### 6. 🛠️ Komponen UI & Navigasi Terstandarisasi
+- Komponen `DataTable` reusable dengan integrasi pagination bawaan Laravel.
+- **Dynamic Pagination**: Pilihan jumlah baris per halaman (`5`, `10`, `25`, `100`) di dalam *filter card* pada semua modul.
+- Desain antarmuka konsisten, responsif, dan rapi menggunakan standar card container Tailwind CSS.
+
+---
+
+## 💻 Panduan Instalasi & Menjalankan Aplikasi
+
+### Prasyarat
+- PHP >= 8.3 dengan ekstensi yang diperlukan (`pdo_sqlsrv` atau `pdo_mysql`, `mbstring`, `openssl`, dll.)
+- Composer >= 2.x
+- Node.js >= 18.x & NPM
+- Database server (SQL Server atau MySQL)
+
+### Langkah-langkah
+
+1. **Clone Repositori**:
+   ```bash
+   git clone https://github.com/hakkam123/sicap-app.git
+   cd sicap-app
+   ```
+
+2. **Instal Dependensi Backend (PHP)**:
+   ```bash
+   composer install
+   ```
+
+3. **Konfigurasi Environment**:
+   Salin berkas `.env.example` menjadi `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+   Sesuaikan konfigurasi koneksi database pada file `.env`:
+   ```env
+   DB_CONNECTION=sqlsrv
+   DB_HOST=127.0.0.1
+   DB_PORT=1433
+   DB_DATABASE=sicap_db
+   DB_USERNAME=sa
+   DB_PASSWORD=your_password
+   ```
+
+4. **Generate Application Key**:
+   ```bash
+   php artisan key:generate
+   ```
+
+5. **Jalankan Migrasi & Database Seeder**:
+   ```bash
+   php artisan migrate --seed
+   ```
+
+6. **Instal Dependensi Frontend (Node.js)**:
+   ```bash
+   npm install
+   ```
+
+7. **Jalankan Server Pengembangan**:
+   Jalankan Vite development server:
+   ```bash
+   npm run dev
+   ```
+   Di terminal terpisah, jalankan Laravel development server:
+   ```bash
+   php artisan serve
+   ```
+   Aplikasi dapat diakses melalui browser di `http://127.0.0.1:8000`.
+
+8. **Build untuk Production**:
+   ```bash
+   npm run build
+   ```
+
+---
+
+## 📁 Struktur Direktori Utama
+
+```
+sicap-app/
+├── app/
+│   ├── Exports/            # File Export Excel (MappingTemplateExport, dll)
+│   ├── Http/Controllers/  # Controller Laravel (Area, Machine, PartNumber, Consume, Mapping, dll)
+│   ├── Imports/            # File Import Excel (MappingImport, ConsumeImport, dll)
+│   └── Models/             # Model Eloquent (Area, Machine, PartNumber, Consume, ImportLog, dll)
+├── database/
+│   ├── migrations/         # Skema tabel database
+│   └── seeders/            # Seeder data awal (User, Role, dll)
+├── resources/
+│   ├── js/
+│   │   ├── Components/     # Komponen Vue reusable (DataTable, Modal, UI Atoms)
+│   │   ├── Layouts/        # Layout utama (AppLayout, GuestLayout)
+│   │   └── Pages/          # Halaman Inertia.js (Area, Machine, PartNumber, Mapping, Consume, Dashboard)
+│   └── css/                # Konfigurasi Tailwind CSS
+└── routes/
+    ├── web.php             # Rute aplikasi web
+    └── auth.php            # Rute autentikasi
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## 📄 Lisensi
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Hak Cipta © 2026 PT Astra Visteon Indonesia. Seluruh hak cipta dilindungi undang-undang.
