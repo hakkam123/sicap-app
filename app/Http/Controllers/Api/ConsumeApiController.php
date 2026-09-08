@@ -11,18 +11,20 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class ConsumeApiController extends Controller
 {
     /**
-     * Synchronize consume records from external systems.
+     * Synchronize consume records from external systems (Batch Sync).
      */
     public function sync(Request $request): JsonResponse
     {
-        // 1. Initial payload validation
+        // 1. Validasi struktur payload (Maksimal 500 item per request untuk mencegah memory & database lock contention)
         $validator = Validator::make($request->all(), [
-            'consumes' => ['required', 'array', 'min:1'],
+            'consumes' => ['required', 'array', 'min:1', 'max:500'],
             'consumes.*.part_number' => ['required', 'string'],
             'consumes.*.area_code' => ['nullable', 'string'],
             'consumes.*.machine_code' => ['nullable', 'string'],
@@ -32,6 +34,7 @@ class ConsumeApiController extends Controller
         ], [
             'consumes.required' => 'Payload consumes wajib disertakan.',
             'consumes.min' => 'Payload consumes minimal berisi 1 rekaman data.',
+            'consumes.max' => 'Payload consumes maksimal berisi 500 rekaman data per request.',
             'consumes.*.part_number.required' => 'Kolom part_number wajib diisi.',
             'consumes.*.quantity.required' => 'Kolom quantity wajib diisi.',
             'consumes.*.quantity.integer' => 'Kolom quantity harus berupa bilangan bulat.',
@@ -66,100 +69,124 @@ class ConsumeApiController extends Controller
 
         $items = $request->input('consumes');
         $businessErrors = [];
-        $processedRecords = [];
+        $recordsToInsert = [];
+        $userId = Auth::id();
+        $now = now();
 
-        try {
-            DB::transaction(function () use ($items, &$businessErrors, &$processedRecords) {
-                foreach ($items as $index => $item) {
-                    $rowNum = $index + 1;
-                    $pnCode = trim((string) $item['part_number']);
-                    $areaCode = isset($item['area_code']) && trim((string)$item['area_code']) !== ''
-                        ? trim((string)$item['area_code'])
-                        : null;
-                    $machineCode = isset($item['machine_code']) && trim((string)$item['machine_code']) !== ''
-                        ? trim((string)$item['machine_code'])
-                        : null;
+        // 2. Optimasi Query: Pre-fetch master data (Bulk Select) untuk mencegah N+1 Query
+        $pnCodes = collect($items)->pluck('part_number')->map(fn($v) => trim((string)$v))->unique()->filter()->values()->all();
+        $areaCodes = collect($items)->pluck('area_code')->map(fn($v) => trim((string)$v))->unique()->filter()->values()->all();
+        $machineCodes = collect($items)->pluck('machine_code')->map(fn($v) => trim((string)$v))->unique()->filter()->values()->all();
 
-                    // 1. Validate PartNumber
-                    $part = PartNumber::where('pn_baan', $pnCode)->first();
-                    if (!$part) {
-                        $businessErrors[] = [
-                            'row' => $rowNum,
-                            'field' => 'part_number',
-                            'message' => "Part number '{$pnCode}' tidak ditemukan di master data.",
-                        ];
-                    }
+        // Map data in-memory menggunakan keyBy untuk pencarian O(1)
+        $partMap = PartNumber::whereIn('pn_baan', $pnCodes)->get()->keyBy('pn_baan');
+        $areaMap = !empty($areaCodes) ? Area::whereIn('code', $areaCodes)->get()->keyBy('code') : collect();
+        $machineMap = !empty($machineCodes) ? Machine::whereIn('code', $machineCodes)->get()->keyBy('code') : collect();
 
-                    // 2. Validate Area (if provided)
-                    $area = null;
-                    if ($areaCode !== null) {
-                        $area = Area::where('code', $areaCode)->first();
-                        if (!$area) {
-                            $businessErrors[] = [
-                                'row' => $rowNum,
-                                'field' => 'area_code',
-                                'message' => "Area dengan kode '{$areaCode}' tidak ditemukan.",
-                            ];
-                        }
-                    }
+        // 3. Validasi aturan bisnis dan susun data untuk bulk insert
+        foreach ($items as $index => $item) {
+            $rowNum = $index + 1;
+            $pnCode = trim((string) $item['part_number']);
+            $areaCode = isset($item['area_code']) && trim((string)$item['area_code']) !== ''
+                ? trim((string)$item['area_code'])
+                : null;
+            $machineCode = isset($item['machine_code']) && trim((string)$item['machine_code']) !== ''
+                ? trim((string)$item['machine_code'])
+                : null;
 
-                    // 3. Validate Machine (if provided)
-                    $machine = null;
-                    if ($machineCode !== null) {
-                        $machine = Machine::where('code', $machineCode)->first();
-                        if (!$machine) {
-                            $businessErrors[] = [
-                                'row' => $rowNum,
-                                'field' => 'machine_code',
-                                'message' => "Machine dengan kode '{$machineCode}' tidak ditemukan.",
-                            ];
-                        }
-                    }
+            // Validasi Part Number
+            $part = $partMap->get($pnCode);
+            if (!$part) {
+                $businessErrors[] = [
+                    'row' => $rowNum,
+                    'field' => 'part_number',
+                    'message' => "Part number '{$pnCode}' tidak ditemukan di master data.",
+                ];
+            }
 
-                    // 4. Validate Machine belongs to Area (if both provided)
-                    if ($machine && $area && $machine->area_id !== $area->id) {
-                        $businessErrors[] = [
-                            'row' => $rowNum,
-                            'field' => 'machine_code',
-                            'message' => "Machine '{$machineCode}' tidak berada di Area '{$areaCode}'.",
-                        ];
-                    }
-
-                    // If errors exist so far, stop processing this row
-                    if (!empty($businessErrors)) {
-                        continue;
-                    }
-
-                    // Calculate amount if omitted
-                    $amount = isset($item['amount']) && $item['amount'] !== null && $item['amount'] !== ''
-                        ? (float) $item['amount']
-                        : null;
-
-                    if ($amount === null && $part && $part->price_per_unit !== null) {
-                        $amount = (float) $part->price_per_unit * abs((int) $item['quantity']);
-                    }
-
-                    // Insert consume
-                    $consume = Consume::create([
-                        'part_number_id' => $part->id,
-                        'area_id' => $area?->id ?? $machine?->area_id ?? null,
-                        'machine_id' => $machine?->id ?? null,
-                        'quantity' => (int) $item['quantity'],
-                        'amount' => $amount,
-                        'consumed_at' => $item['consumed_at'],
-                        'source' => 'api',
-                        'created_by' => Auth::id(),
-                    ]);
-
-                    $processedRecords[] = $consume;
+            // Validasi Area (jika diberikan)
+            $area = null;
+            if ($areaCode !== null) {
+                $area = $areaMap->get($areaCode);
+                if (!$area) {
+                    $businessErrors[] = [
+                        'row' => $rowNum,
+                        'field' => 'area_code',
+                        'message' => "Area dengan kode '{$areaCode}' tidak ditemukan.",
+                    ];
                 }
+            }
 
-                if (!empty($businessErrors)) {
-                    throw new \Exception('Validation failed');
+            // Validasi Machine (jika diberikan)
+            $machine = null;
+            if ($machineCode !== null) {
+                $machine = $machineMap->get($machineCode);
+                if (!$machine) {
+                    $businessErrors[] = [
+                        'row' => $rowNum,
+                        'field' => 'machine_code',
+                        'message' => "Machine dengan kode '{$machineCode}' tidak ditemukan.",
+                    ];
+                }
+            }
+
+            // Validasi kesesuaian relasi Machine dengan Area
+            if ($machine && $area && $machine->area_id !== $area->id) {
+                $businessErrors[] = [
+                    'row' => $rowNum,
+                    'field' => 'machine_code',
+                    'message' => "Machine '{$machineCode}' tidak berada di Area '{$areaCode}'.",
+                ];
+            }
+
+            // Jika ditemukan error pada baris ini, lanjutkan iterasi pengecekan baris lainnya
+            if (!empty($businessErrors)) {
+                continue;
+            }
+
+            // Kalkulasi amount jika null
+            $amount = isset($item['amount']) && $item['amount'] !== null && $item['amount'] !== ''
+                ? (float) $item['amount']
+                : null;
+
+            if ($amount === null && $part && $part->price_per_unit !== null) {
+                $amount = (float) $part->price_per_unit * abs((int) $item['quantity']);
+            }
+
+            // Siapkan row data (Sertakan ULID dan Timestamps karena insert query builder tidak memicu Eloquent events)
+            $recordsToInsert[] = [
+                'id' => (string) Str::ulid(),
+                'part_number_id' => $part->id,
+                'area_id' => $area?->id ?? $machine?->area_id ?? null,
+                'machine_id' => $machine?->id ?? null,
+                'quantity' => (int) $item['quantity'],
+                'amount' => $amount,
+                'consumed_at' => $item['consumed_at'],
+                'source' => 'api',
+                'created_by' => $userId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        // Jika ada kegagalan validasi master data, batalkan penyimpanan
+        if (!empty($businessErrors)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $businessErrors,
+            ], 422);
+        }
+
+        // 4. Eksekusi Database Transaction & Bulk Insert per 100 record (mengurangi overhead & lock waktu di SQL Server)
+        try {
+            DB::transaction(function () use ($recordsToInsert) {
+                foreach (array_chunk($recordsToInsert, 100) as $chunk) {
+                    Consume::insert($chunk);
                 }
             });
 
-            $totalCount = count($processedRecords);
+            $totalCount = count($recordsToInsert);
 
             return response()->json([
                 'status' => 'success',
@@ -172,12 +199,18 @@ class ConsumeApiController extends Controller
             ], 200);
 
         } catch (\Throwable $e) {
+            // Catat log error database
+            Log::channel('security')->error('API Sync Database Error', [
+                'error' => $e->getMessage(),
+                'ip' => $request->ip(),
+                'user_id' => $userId,
+            ]);
+
             return response()->json([
                 'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $businessErrors,
-            ], 422);
+                'message' => 'Terjadi kesalahan saat menyimpan data ke database.',
+                'errors' => [],
+            ], 500);
         }
     }
 }
-

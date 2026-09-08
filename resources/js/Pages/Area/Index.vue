@@ -1,10 +1,16 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTable from '@/Components/Table/DataTable.vue';
+import Modal from '@/Components/Modal.vue';
 import ConfirmModal from '@/Components/UI/ConfirmModal.vue';
-import { Search, RotateCcw, Plus } from 'lucide-vue-next';
+import InputLabel from '@/Components/InputLabel.vue';
+import TextInput from '@/Components/TextInput.vue';
+import InputError from '@/Components/InputError.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+import { Search, RotateCcw, Plus, X } from 'lucide-vue-next';
 
 const page = usePage();
 const isAdmin = computed(() => {
@@ -60,10 +66,54 @@ const tableColumns = [
 ];
 
 // ==========================================
-// 3. NAVIGASI
+// 3. CREATE / EDIT MODAL FORM
 // ==========================================
-const goToCreate = () => router.visit(route('areas.create'));
-const goToEdit = (row) => router.visit(route('areas.edit', row.id));
+const isModalOpen = ref(false);
+const editingArea = ref(null);
+const isEditing = computed(() => !!editingArea.value);
+
+const form = useForm({
+    code: '',
+    name: '',
+    description: '',
+});
+
+const openCreateModal = () => {
+    editingArea.value = null;
+    form.reset();
+    form.clearErrors();
+    isModalOpen.value = true;
+};
+
+const openEditModal = (area) => {
+    editingArea.value = area;
+    form.clearErrors();
+    form.code = area.code || '';
+    form.name = area.name || '';
+    form.description = area.description || '';
+    isModalOpen.value = true;
+};
+
+const closeModal = () => {
+    isModalOpen.value = false;
+    editingArea.value = null;
+    form.reset();
+    form.clearErrors();
+};
+
+const submitForm = () => {
+    if (isEditing.value) {
+        form.put(route('areas.update', editingArea.value.id), {
+            preserveScroll: true,
+            onSuccess: () => closeModal(),
+        });
+    } else {
+        form.post(route('areas.store'), {
+            preserveScroll: true,
+            onSuccess: () => closeModal(),
+        });
+    }
+};
 
 // ==========================================
 // 4. DELETE CONFIRMATION MODAL
@@ -82,6 +132,7 @@ const closeConfirm = () => {
 const doDelete = () => {
     isDeleting.value = true;
     router.delete(route('areas.destroy', confirmModal.value.id), {
+        preserveScroll: true,
         onFinish: () => {
             isDeleting.value = false;
             closeConfirm();
@@ -181,7 +232,7 @@ const doDelete = () => {
                     >
                         <button
                             type="button"
-                            @click="goToCreate"
+                            @click="openCreateModal"
                             class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-gray-700 transition"
                         >
                             <Plus class="w-3.5 h-3.5" />
@@ -193,25 +244,25 @@ const doDelete = () => {
 
             </div>
 
-
-
             <!-- DATA TABLE -->
             <DataTable
                 :columns="tableColumns"
                 :data="areas"
             >
                 <template #cell-code="{ value }">
-                    <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{{ value }}</span>
+                    <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded font-bold text-slate-800">{{ value }}</span>
                 </template>
 
                 <template #cell-machines_count="{ value }">
-                    <span>{{ value }} mesin</span>
+                    <span class="bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded text-xs">
+                        {{ value }} mesin
+                    </span>
                 </template>
 
                 <template #actions="{ row }">
                     <button
                         type="button"
-                        @click="goToEdit(row)"
+                        @click="openEditModal(row)"
                         class="text-blue-600 hover:text-blue-900 hover:underline font-semibold inline-flex items-center gap-1 text-xs"
                     >
                         Edit
@@ -231,11 +282,85 @@ const doDelete = () => {
             </DataTable>
         </div>
 
+        <!-- MODAL FORM CREATE / EDIT AREA -->
+        <Modal :show="isModalOpen" @close="closeModal" max-width="lg">
+            <div class="p-6 space-y-5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">
+                            {{ isEditing ? 'Edit Data Area' : 'Tambah Area Baru' }}
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            {{ isEditing ? 'Perbarui informasi area yang sudah terdaftar.' : 'Masukkan informasi kode dan nama area baru.' }}
+                        </p>
+                    </div>
+                    <button @click="closeModal" class="text-slate-400 hover:text-slate-600 p-1">
+                        <X class="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form @submit.prevent="submitForm" class="space-y-4">
+                    <!-- Code -->
+                    <div>
+                        <InputLabel for="code" value="Kode Area *" />
+                        <TextInput
+                            id="code"
+                            v-model="form.code"
+                            type="text"
+                            class="mt-1 block w-full uppercase font-mono text-xs"
+                            placeholder="Contoh: SMT, FA, COMMON"
+                            required
+                            autofocus
+                        />
+                        <InputError class="mt-1" :message="form.errors.code" />
+                    </div>
+
+                    <!-- Name -->
+                    <div>
+                        <InputLabel for="name" value="Nama Area *" />
+                        <TextInput
+                            id="name"
+                            v-model="form.name"
+                            type="text"
+                            class="mt-1 block w-full text-xs"
+                            placeholder="Contoh: Surface Mount Technology"
+                            required
+                        />
+                        <InputError class="mt-1" :message="form.errors.name" />
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+                        <InputLabel for="description" value="Deskripsi" />
+                        <textarea
+                            id="description"
+                            v-model="form.description"
+                            rows="3"
+                            class="mt-1 block w-full border-gray-300 focus:border-slate-900 focus:ring-slate-900 rounded-md shadow-sm text-xs"
+                            placeholder="Keterangan opsional area..."
+                        ></textarea>
+                        <InputError class="mt-1" :message="form.errors.description" />
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                        <SecondaryButton type="button" @click="closeModal">
+                            Batal
+                        </SecondaryButton>
+
+                        <PrimaryButton :disabled="form.processing">
+                            {{ isEditing ? 'Simpan Perubahan' : 'Tambah Area' }}
+                        </PrimaryButton>
+                    </div>
+                </form>
+            </div>
+        </Modal>
+
         <!-- Confirm Delete Modal -->
         <ConfirmModal
             :show="confirmModal.show"
             title="Konfirmasi Hapus Area"
-            :message="`Yakin ingin menghapus area '${confirmModal.name}'? Mesin yang terkait juga tidak bisa dihapus jika ada data consume.`"
+            :message="`Yakin ingin menghapus area '${confirmModal.name}'? Mesin yang terkait tidak bisa dihapus jika ada data consume.`"
             confirm-label="Hapus Area"
             variant="danger"
             :loading="isDeleting"

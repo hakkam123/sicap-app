@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -25,7 +26,21 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Memastikan request API selalu merender response JSON
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Global handler untuk exception 429 Too Many Requests
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                $headers = $e->getHeaders();
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Terlalu banyak permintaan ke API. Silakan jeda beberapa saat.',
+                    'retry_after_seconds' => (int) ($headers['Retry-After'] ?? 60),
+                ], 429, $headers);
+            }
+        });
     })->create();

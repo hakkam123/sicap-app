@@ -11,11 +11,6 @@ return [
     |--------------------------------------------------------------------------
     | Default Log Channel
     |--------------------------------------------------------------------------
-    |
-    | This option defines the default log channel that is utilized to write
-    | messages to your logs. The value provided here should match one of
-    | the channels present in the list of "channels" configured below.
-    |
     */
 
     'default' => env('LOG_CHANNEL', 'stack'),
@@ -24,11 +19,6 @@ return [
     |--------------------------------------------------------------------------
     | Deprecations Log Channel
     |--------------------------------------------------------------------------
-    |
-    | This option controls the log channel that should be used to log warnings
-    | regarding deprecated PHP and library features. This allows you to get
-    | your application ready for upcoming major versions of dependencies.
-    |
     */
 
     'deprecations' => [
@@ -40,14 +30,6 @@ return [
     |--------------------------------------------------------------------------
     | Log Channels
     |--------------------------------------------------------------------------
-    |
-    | Here you may configure the log channels for your application. Laravel
-    | utilizes the Monolog PHP logging library, which includes a variety
-    | of powerful log handlers and formatters that you're free to use.
-    |
-    | Available drivers: "single", "daily", "monthly", "slack", "syslog",
-    |                    "errorlog", "monolog", "custom", "stack"
-    |
     */
 
     'channels' => [
@@ -56,6 +38,15 @@ return [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
             'ignore_exceptions' => false,
+        ],
+
+        // Channel khusus audit & monitoring keamanan
+        'security' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/security.log'),
+            'level' => 'warning',
+            'max_files' => 30, // Retensi 30 hari
+            'replace_placeholders' => true,
         ],
 
         'single' => [

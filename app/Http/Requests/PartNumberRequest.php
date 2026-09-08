@@ -22,7 +22,7 @@ class PartNumberRequest extends FormRequest
      */
     public function rules(): array
     {
-        $partNumber = $this->route('part_number');
+        $partNumber = $this->route('part_number') ?? $this->route('partNumber');
 
         return [
             'pn_baan' => [
@@ -33,6 +33,10 @@ class PartNumberRequest extends FormRequest
             ],
             'description' => ['nullable', 'string'],
             'price_per_unit' => ['nullable', 'numeric', 'min:0'],
+            'area_ids' => ['nullable', 'array'],
+            'area_ids.*' => ['string', 'exists:areas,id'],
+            'machine_ids' => ['nullable', 'array'],
+            'machine_ids.*' => ['string', 'exists:machines,id'],
         ];
     }
 
@@ -52,4 +56,5 @@ class PartNumberRequest extends FormRequest
         ];
     }
 }
+
 
