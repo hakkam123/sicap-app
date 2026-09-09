@@ -106,7 +106,7 @@
             <tr>
                 <td>
                     <div class="header-title">PT ASTRA VISTEON INDONESIA</div>
-                    <div class="header-subtitle">SICAP — LAPORAN KONSUMSI SPAREPART</div>
+                    <div class="header-subtitle">COPA — LAPORAN KONSUMSI SPAREPART</div>
                 </td>
                 <td class="header-meta">
                     <div>Dicetak pada: {{ now()->translatedFormat('d F Y H:i') }} WIB</div>
@@ -184,7 +184,7 @@
     </table>
 
     <div class="footer">
-        Dokumen ini dihasilkan secara otomatis oleh Sistem Informasi Consume Sparepart (SICAP).
+        Dokumen ini dihasilkan secara otomatis oleh COPA (Consumption Part Application).
     </div>
 </body>
 </html>

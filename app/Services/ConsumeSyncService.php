@@ -6,6 +6,7 @@ use App\Models\Area;
 use App\Models\Consume;
 use App\Models\Machine;
 use App\Models\PartNumber;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -74,6 +75,8 @@ class ConsumeSyncService
             $endTime = now();
             $duration = $endTime->diffInSeconds($startTime);
             $syncedCount = $result['processed'] ?? 0;
+
+            Cache::forever('last_api_sync_at', $endTime->toIso8601String());
 
             Log::info("Sync API Completed at {$endTime->toDateTimeString()} ({$duration}s). Synced {$syncedCount} records.", [
                 'total_received' => count($items),

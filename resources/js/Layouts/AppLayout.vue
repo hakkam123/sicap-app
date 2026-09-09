@@ -95,39 +95,23 @@ const logout = () => {
 
             <!-- Brand Logo Header -->
             <div
-                class="h-16 px-6 bg-slate-950 flex items-center justify-between border-b border-slate-800"
+                class="h-16 px-5 bg-slate-950 flex items-center justify-center border-b border-slate-800 relative overflow-hidden"
             >
-                    <Link
-                        :href="route('dashboard')"
-                        class="flex items-center gap-3 min-w-0"
-                    >
-                        <!-- Logo -->
-                        <div
-                            class="w-9 h-9 shrink-0 rounded-lg bg-white flex items-center justify-center text-slate-900 font-black text-sm tracking-tight shadow-md"
-                        >
-                            SiCAP
-                        </div>
+                <Link
+                    :href="route('dashboard')"
+                    class="flex items-center justify-center w-full hover:opacity-90 transition-opacity"
+                >
+                    <img
+                        src="/copa-text.png"
+                        alt="COPA - Consumption Part Application"
+                        class="h-10 w-auto max-w-[180px] object-contain"
+                    />
+                </Link>
 
-                        <!-- Brand Name -->
-                        <div class="min-w-0">
-                            <span
-                                class="block text-sm font-bold tracking-tight text-white leading-tight"
-                            >
-                                System Information
-                            </span>
-
-                            <span
-                                class="block text-[10px] font-medium text-slate-400 leading-tight mt-0.5"
-                            >
-                                Consumption Sparepart
-                            </span>
-                        </div>
-                    </Link>
-
-
+                <!-- Tombol Close (Hanya Muncul di Mobile) -->
                 <button
                     @click="isMobileSidebarOpen = false"
-                    class="lg:hidden text-slate-400 hover:text-white p-1 rounded-md transition"
+                    class="lg:hidden absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded-md transition"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -452,13 +436,6 @@ const logout = () => {
 
             <div class="p-4 bg-slate-950 border-t border-slate-800">
                 <div class="flex items-center gap-3 min-w-0">
-                    <!-- User Avatar -->
-                    <div
-                        class="w-8 h-8 rounded-full bg-white text-slate-900 font-bold flex items-center justify-center text-xs shrink-0"
-                    >
-                        {{ user?.name ? user.name.charAt(0).toUpperCase() : 'U' }}
-                    </div>
-
                     <!-- User Name -->
                     <div class="min-w-0 flex-1">
                         <p class="text-xs font-semibold text-white truncate">

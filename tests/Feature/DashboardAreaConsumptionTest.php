@@ -30,5 +30,39 @@ class DashboardAreaConsumptionTest extends TestCase
             ->has('areaConsumption.common')
         );
     }
+
+    public function test_drill_down_by_category_fa(): void
+    {
+        $user = User::first() ?? User::factory()->create();
+
+        $response = $this->actingAs($user)->getJson('/dashboard/drill-down?type=category&id=fa');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'title',
+            'rows',
+            'total_qty',
+            'total_amount',
+            'pagination',
+        ]);
+        $response->assertJsonFragment(['title' => 'Konsumsi Area — FA (Fabrication)']);
+    }
+
+    public function test_drill_down_by_category_common(): void
+    {
+        $user = User::first() ?? User::factory()->create();
+
+        $response = $this->actingAs($user)->getJson('/dashboard/drill-down?type=category&id=common');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'title',
+            'rows',
+            'total_qty',
+            'total_amount',
+            'pagination',
+        ]);
+        $response->assertJsonFragment(['title' => 'Konsumsi Area — Common (FA & SMT)']);
+    }
 }
 

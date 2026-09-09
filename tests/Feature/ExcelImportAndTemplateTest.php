@@ -184,5 +184,45 @@ class ExcelImportAndTemplateTest extends TestCase
             'source' => 'import_excel',
         ]);
     }
+
+    public function test_consume_update_route(): void
+    {
+        $area = Area::firstOrCreate(['code' => 'FA'], ['name' => 'Final Assembly']);
+        $machine = Machine::firstOrCreate(
+            ['area_id' => $area->id, 'code' => 'MC_FA_01'],
+            ['name' => 'Machine 1']
+        );
+        $part = PartNumber::firstOrCreate(
+            ['pn_baan' => 'TEST-PN-CONS-002'],
+            ['description' => 'Part 2', 'price_per_unit' => 15000]
+        );
+
+        $consume = Consume::create([
+            'part_number_id' => $part->id,
+            'area_id' => $area->id,
+            'machine_id' => $machine->id,
+            'quantity' => 2,
+            'amount' => 30000,
+            'consumed_at' => now()->format('Y-m-d'),
+            'source' => 'manual',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->put(route('consume.update', $consume->id), [
+            'part_number_id' => $part->id,
+            'area_id' => $area->id,
+            'machine_id' => $machine->id,
+            'quantity' => 5,
+            'amount' => 75000,
+            'consumed_at' => now()->format('Y-m-d'),
+        ]);
+
+        $response->assertRedirect(route('consume.index'));
+        $this->assertDatabaseHas('consumes', [
+            'id' => $consume->id,
+            'quantity' => 5,
+            'amount' => 75000,
+        ]);
+    }
 }
 

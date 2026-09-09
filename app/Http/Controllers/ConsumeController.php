@@ -11,10 +11,14 @@ use App\Models\Consume;
 use App\Models\ImportLog;
 use App\Models\Machine;
 use App\Models\PartNumber;
+use App\Models\SyncSchedule;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -70,12 +74,24 @@ class ConsumeController extends Controller
             ->orderBy('pn_baan')
             ->get();
 
+        $rawLastSync = Cache::get('last_api_sync_at')
+            ?? Consume::where('source', 'api')->latest('created_at')->value('created_at')
+            ?? Consume::latest('created_at')->value('created_at');
+
+        $lastSyncFormatted = $rawLastSync
+            ? Carbon::parse($rawLastSync)->setTimezone('Asia/Jakarta')->format('H:i:s \W\I\B, d/m/Y')
+            : null;
+
+        $syncSchedules = SyncSchedule::orderBy('time')->get();
+
         return Inertia::render('Consume/Index', [
             'consumes' => $consumes,
             'areas' => $areas,
             'filters' => array_merge($request->only(['search', 'area_id', 'machine_id', 'date_from', 'date_to']), ['per_page' => (int) $request->input('per_page', 10)]),
             'importLogs' => $importLogs,
             'partNumbers' => $partNumbers,
+            'lastSyncAt' => $lastSyncFormatted,
+            'syncSchedules' => $syncSchedules,
         ]);
     }
 
@@ -122,6 +138,36 @@ class ConsumeController extends Controller
         ]);
 
         return redirect()->route('consume.index')->with('success', 'Data consume berhasil ditambahkan');
+    }
+
+    /**
+     * Update the specified consume record in storage.
+     */
+    public function update(ConsumeRequest $request, Consume $consume): RedirectResponse
+    {
+        $amount = $request->input('amount');
+        $qty = (int) $request->quantity;
+
+        // Auto-calculate amount if omitted
+        if ($amount === null || $amount === '') {
+            $part = PartNumber::find($request->part_number_id);
+            if ($part && $part->price_per_unit !== null) {
+                $amount = (float) $part->price_per_unit * $qty;
+            } else {
+                $amount = null;
+            }
+        }
+
+        $consume->update([
+            'part_number_id' => $request->part_number_id,
+            'area_id' => $request->area_id,
+            'machine_id' => $request->machine_id,
+            'quantity' => $qty,
+            'amount' => $amount,
+            'consumed_at' => $request->consumed_at,
+        ]);
+
+        return redirect()->route('consume.index')->with('success', 'Data consume berhasil diperbarui');
     }
 
     /**
@@ -224,5 +270,38 @@ class ConsumeController extends Controller
         } catch (\Throwable $e) {
             return redirect()->route('consume.index')->with('error', "Sinkronisasi API gagal: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Update the dynamic sync schedules.
+     */
+    public function updateSyncSchedules(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'schedules' => ['present', 'array'],
+            'schedules.*.time' => ['required', 'string', 'regex:/^([01]\d|2[0-3]):([0-5]\d)$/'],
+            'schedules.*.is_active' => ['nullable', 'boolean'],
+        ], [
+            'schedules.array' => 'Data jadwal tidak valid.',
+            'schedules.*.time.required' => 'Format jam wajib diisi.',
+            'schedules.*.time.regex' => 'Format jam harus HH:MM (contoh: 08:30).',
+        ]);
+
+        $schedules = $request->input('schedules', []);
+
+        DB::transaction(function () use ($schedules) {
+            SyncSchedule::query()->delete();
+
+            foreach ($schedules as $item) {
+                if (!empty($item['time'])) {
+                    SyncSchedule::create([
+                        'time' => $item['time'],
+                        'is_active' => isset($item['is_active']) ? (bool) $item['is_active'] : true,
+                    ]);
+                }
+            }
+        });
+
+        return redirect()->route('consume.index')->with('success', 'Pengaturan jadwal sinkronisasi otomatis berhasil disimpan.');
     }
 }

@@ -317,7 +317,7 @@ const doDelete = () => {
                             {{ isEditing ? 'Edit Data Pengguna' : 'Tambah Pengguna Baru' }}
                         </h3>
                         <p class="text-xs text-slate-500 mt-0.5">
-                            {{ isEditing ? 'Perbarui informasi profil dan peran pengguna.' : 'Daftarkan akun pengguna baru ke dalam sistem SICAP.' }}
+                            {{ isEditing ? 'Perbarui informasi profil dan peran pengguna.' : 'Daftarkan akun pengguna baru ke dalam sistem COPA.' }}
                         </p>
                     </div>
                     <button @click="closeModal" class="text-slate-400 hover:text-slate-600 p-1">

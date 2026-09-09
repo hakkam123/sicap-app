@@ -14,7 +14,7 @@ class ImportLogController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = ImportLog::with('user:id,name')->orderBy('created_at', 'DESC');
+        $query = ImportLog::with('user:id,name,email')->orderBy('created_at', 'DESC');
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);

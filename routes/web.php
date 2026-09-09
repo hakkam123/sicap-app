@@ -27,9 +27,11 @@ Route::middleware('auth')->group(function () {
     // Consume Unified & Actions
     Route::get('/consume', [ConsumeController::class, 'index'])->name('consume.index');
     Route::post('/consume', [ConsumeController::class, 'store'])->name('consume.store');
+    Route::put('/consume/{consume}', [ConsumeController::class, 'update'])->name('consume.update');
     Route::post('/consume/import', [ConsumeController::class, 'import'])->name('consume.import');
     Route::get('/consume/template', [ConsumeController::class, 'downloadTemplate'])->name('consume.template');
     Route::post('/consume/sync-api', [ConsumeController::class, 'syncApi'])->name('consume.sync-api');
+    Route::post('/consume/sync-schedules', [ConsumeController::class, 'updateSyncSchedules'])->name('consume.sync-schedules.update');
     Route::get('/consume/export', [ConsumeController::class, 'export'])->name('consume.export');
     Route::get('/consume/machines-by-area', [ConsumeController::class, 'getMachinesByArea'])->name('consume.machines-by-area');
     Route::delete('/consume/{consume}', [ConsumeController::class, 'destroy'])->name('consume.destroy');

@@ -4,8 +4,6 @@ import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
 import {
-    FileSpreadsheet,
-    FileText,
     Search,
     RotateCcw,
     Layers,
@@ -189,165 +187,158 @@ const formatNumber = (val) => {
 
         <div class="py-6 px-4 sm:px-6 lg:px-8 space-y-6">
 
-            <!-- 1. ACTION BAR + FILTER BAR (Satu Section) -->
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
+        <!-- Action Buttons Row (Dikeluarkan dari card filter, posisi di kanan atas) -->
+        <div class="flex items-center justify-end gap-2 mb-3">
+            <button
+                type="button"
+                @click="exportExcel"
+                class="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                title="Unduh laporan dalam format spreadsheet Excel"
+            >
+                <span>Export Excel</span>
+            </button>
+
+            <button
+                type="button"
+                @click="exportPdf"
+                class="inline-flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                title="Unduh laporan dalam format dokumen PDF"
+            >
+                <span>Export PDF</span>
+            </button>
+        </div>
+
+        <!-- Filter Card -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            
+            <!-- Filter Bar (Menggunakan Flexbox agar sejajar sebaris di layar besar) -->
+            <div class="flex flex-col lg:flex-row gap-3 items-end">
                 
-                <!-- Row 1: Tombol Export -->
-                <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div class="flex items-center gap-2">
-                        <button
-                            type="button"
-                            @click="exportExcel"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-                            title="Unduh laporan dalam format spreadsheet Excel"
-                        >
-                            <FileSpreadsheet class="w-4 h-4" />
-                            <span>Export Excel</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            @click="exportPdf"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-                            title="Unduh laporan dalam format dokumen PDF"
-                        >
-                            <FileText class="w-4 h-4" />
-                            <span>Export PDF</span>
-                        </button>
-                    </div>
-
-                    <!-- Per Page Option -->
-                    <div class="flex items-center gap-2">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                            Baris:
-                        </span>
-                        <select
-                            v-model="filterForm.per_page"
-                            @change="applyFilters"
-                            class="py-1 px-2 border border-slate-300 bg-white rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
-                        >
-                            <option :value="10">10</option>
-                            <option :value="15">15</option>
-                            <option :value="25">25</option>
-                            <option :value="50">50</option>
-                            <option :value="100">100</option>
-                        </select>
+                <!-- Search Pencarian -->
+                <div class="flex-1 min-w-[200px]">
+                    <label for="filter_search" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Pencarian
+                    </label>
+                    <div class="relative">
+                        <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            id="filter_search"
+                            type="text"
+                            v-model="filterForm.search"
+                            placeholder="Ketik PN BAAN atau nama part..."
+                            @keydown.enter="applyFilters"
+                            class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
+                        />
                     </div>
                 </div>
 
-                <!-- Divider -->
-                <div class="border-t border-slate-100"></div>
-
-                <!-- Row 2: Filter Inputs dengan Label Uppercase -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
-                    
-                    <!-- Search PN / Deskripsi -->
-                    <div class="lg:col-span-3">
-                        <label for="filter_search" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Pencarian PN / Deskripsi
-                        </label>
-                        <div class="relative">
-                            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                            <input
-                                id="filter_search"
-                                type="text"
-                                v-model="filterForm.search"
-                                placeholder="Ketik PN atau nama part..."
-                                @keydown.enter="applyFilters"
-                                class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Dropdown Area -->
-                    <div class="lg:col-span-2">
-                        <label for="filter_area" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Area
-                        </label>
-                        <select
-                            id="filter_area"
-                            v-model="filterForm.area_id"
-                            @change="handleAreaChange"
-                            class="w-full py-2 px-3 border border-slate-300 bg-white rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
-                        >
-                            <option value="">-- Semua Area --</option>
-                            <option v-for="area in areas" :key="area.id" :value="area.id">
-                                {{ area.name }} ({{ area.code }})
-                            </option>
-                        </select>
-                    </div>
-
-                    <!-- Dropdown Machine (Dependent) -->
-                    <div class="lg:col-span-2">
-                        <label for="filter_machine" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Machine / Station
-                        </label>
-                        <select
-                            id="filter_machine"
-                            v-model="filterForm.machine_id"
-                            :disabled="!filterForm.area_id || isLoadingMachines"
-                            class="w-full py-2 px-3 border border-slate-300 bg-white rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                            <option value="">
-                                {{ filterForm.area_id ? '-- Semua Machine --' : 'Pilih area dulu' }}
-                            </option>
-                            <option v-for="m in machineOptions" :key="m.id" :value="m.id">
-                                {{ m.name }} ({{ m.code }})
-                            </option>
-                        </select>
-                    </div>
-
-                    <!-- Date From -->
-                    <div class="lg:col-span-2">
-                        <label for="filter_date_from" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Dari Tanggal
-                        </label>
-                        <input
-                            id="filter_date_from"
-                            type="date"
-                            v-model="filterForm.date_from"
-                            class="w-full py-2 px-3 border border-slate-300 rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
-                        />
-                    </div>
-
-                    <!-- Date To -->
-                    <div class="lg:col-span-2">
-                        <label for="filter_date_to" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Sampai Tanggal
-                        </label>
-                        <input
-                            id="filter_date_to"
-                            type="date"
-                            v-model="filterForm.date_to"
-                            class="w-full py-2 px-3 border border-slate-300 rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
-                        />
-                    </div>
-
-                    <!-- Native Buttons: Cari & Reset -->
-                    <div class="lg:col-span-1 flex items-center gap-1.5">
-                        <button
-                            type="button"
-                            @click="applyFilters"
-                            :disabled="isSearching"
-                            class="flex-1 inline-flex items-center justify-center gap-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-60"
-                            title="Terapkan filter pencarian"
-                        >
-                            <Search class="w-3.5 h-3.5" />
-                            <span>Cari</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            @click="resetFilters"
-                            class="inline-flex items-center justify-center p-2 border border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg text-xs transition"
-                            title="Reset seluruh filter"
-                        >
-                            <RotateCcw class="w-3.5 h-3.5" />
-                        </button>
-                    </div>
-
+                <!-- Dropdown Area -->
+                <div class="w-full lg:w-40">
+                    <label for="filter_area" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Area
+                    </label>
+                    <select
+                        id="filter_area"
+                        v-model="filterForm.area_id"
+                        @change="handleAreaChange"
+                        class="w-full py-2 px-3 border border-slate-300 bg-white rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
+                    >
+                        <option value="">-- Semua Area --</option>
+                        <option v-for="area in areas" :key="area.id" :value="area.id">
+                            {{ area.name }} ({{ area.code }})
+                        </option>
+                    </select>
                 </div>
+
+                <!-- Dropdown Machine -->
+                <div class="w-full lg:w-40">
+                    <label for="filter_machine" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Machine
+                    </label>
+                    <select
+                        id="filter_machine"
+                        v-model="filterForm.machine_id"
+                        :disabled="!filterForm.area_id || isLoadingMachines"
+                        class="w-full py-2 px-3 border border-slate-300 bg-white rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                        <option value="">
+                            {{ filterForm.area_id ? '-- Semua Machine --' : 'Pilih area dulu' }}
+                        </option>
+                        <option v-for="m in machineOptions" :key="m.id" :value="m.id">
+                            {{ m.name }} ({{ m.code }})
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Date From -->
+                <div class="w-full lg:w-36">
+                    <label for="filter_date_from" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Dari Tanggal
+                    </label>
+                    <input
+                        id="filter_date_from"
+                        type="date"
+                        v-model="filterForm.date_from"
+                        class="w-full py-2 px-3 border border-slate-300 rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
+                    />
+                </div>
+
+                <!-- Date To -->
+                <div class="w-full lg:w-36">
+                    <label for="filter_date_to" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Sampai Tanggal
+                    </label>
+                    <input
+                        id="filter_date_to"
+                        type="date"
+                        v-model="filterForm.date_to"
+                        class="w-full py-2 px-3 border border-slate-300 rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
+                    />
+                </div>
+
+                <!-- Tampilkan (Per Page) -->
+                <div class="w-full lg:w-20">
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Tampilkan
+                    </label>
+                    <select
+                        v-model="filterForm.per_page"
+                        @change="applyFilters"
+                        class="w-full py-2 px-3 border border-slate-300 bg-white rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
+                    >
+                        <option :value="10">10</option>
+                        <option :value="15">15</option>
+                        <option :value="25">25</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                    </select>
+                </div>
+
+                <!-- Buttons Cari & Reset -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button
+                        type="button"
+                        @click="applyFilters"
+                        :disabled="isSearching"
+                        class="inline-flex items-center justify-center gap-1.5 py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-60"
+                        title="Terapkan filter pencarian"
+                    >
+                        <Search class="w-3.5 h-3.5" />
+                        <span>Cari</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="resetFilters"
+                        class="inline-flex items-center justify-center py-2 px-3 border border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg text-xs transition"
+                        title="Reset seluruh filter"
+                    >
+                        <RotateCcw class="w-3.5 h-3.5" />
+                    </button>
+                </div>
+
             </div>
+        </div>
 
             <!-- 2. SUMMARY CARDS (2 Card Kecil) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

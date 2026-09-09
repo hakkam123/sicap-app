@@ -337,8 +337,24 @@ const areaBarChartConfig = computed(() => {
                         label: function (ctx) {
                             return `Nominal: ${formatRupiah(ctx.raw)}`;
                         },
+                        afterLabel: function () {
+                            return 'Klik untuk lihat detail transaksi';
+                        },
                     },
                 },
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const idx = elements[0].index;
+                    const categories = ['fa', 'smt', 'common'];
+                    const selected = categories[idx];
+                    if (selected) {
+                        openCategoryDrillDown(selected);
+                    }
+                }
+            },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
             scales: {
                 x: {
@@ -387,6 +403,30 @@ const drillDown = ref({
     from: 0,
     to: 0,
 });
+
+const openCategoryDrillDown = async (category) => {
+    const labels = {
+        fa: 'FA (Fabrication)',
+        smt: 'SMT (Surface Mount)',
+        common: 'Common (FA & SMT)',
+    };
+    drillDown.value = {
+        show: true,
+        loading: true,
+        type: 'category',
+        id: category,
+        title: `Konsumsi Area — ${labels[category] || category.toUpperCase()}`,
+        rows: [],
+        total_qty: 0,
+        total_amount: 0,
+        page: 1,
+        last_page: 1,
+        total: 0,
+        from: 0,
+        to: 0,
+    };
+    await fetchDrillDown('category', category, 1);
+};
 
 const openAreaDrillDown = async (area) => {
     const type = area.area_id ? 'area' : 'unassigned';
@@ -765,7 +805,7 @@ const sortedTopConsumes = computed(() => {
                             <div>
                                 <h3 class="text-sm font-bold text-slate-800">Konsumsi Area</h3>
                                 <p class="text-xs text-slate-400 mt-0.5">
-                                    Total nominal berdasarkan part mapping FA, SMT, & Common.
+                                    Total nominal berdasarkan part mapping FA, SMT, & Common (klik bar atau tombol untuk lihat detail).
                                 </p>
                             </div>
                         </div>
@@ -789,35 +829,52 @@ const sortedTopConsumes = computed(() => {
                         </div>
                     </div>
 
-                    <!-- Mini Summary per Area -->
+                    <!-- Mini Summary per Area (Clickable to open Drill-down Modal) -->
                     <div class="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2 text-center">
-                        <div class="p-1.5 rounded-lg bg-blue-50/60 border border-blue-100/80">
+                        <button
+                            type="button"
+                            @click="openCategoryDrillDown('fa')"
+                            class="p-1.5 rounded-lg bg-blue-50/60 hover:bg-blue-100/80 border border-blue-100/80 hover:border-blue-300 transition-all cursor-pointer text-center group"
+                            title="Klik untuk lihat transaksi FA"
+                        >
                             <div class="flex items-center justify-center gap-1 mb-0.5">
                                 <span class="w-2 h-2 rounded-full bg-blue-500"></span>
                                 <span class="text-[10px] font-bold text-blue-700">FA</span>
                             </div>
-                            <span class="block text-xs font-bold text-slate-800 truncate" :title="formatRupiah(areaConsumption?.fa || 0)">
+                            <span class="block text-xs font-bold text-slate-800 truncate group-hover:text-blue-900" :title="formatRupiah(areaConsumption?.fa || 0)">
                                 {{ formatShortRupiah(areaConsumption?.fa || 0) }}
                             </span>
-                        </div>
-                        <div class="p-1.5 rounded-lg bg-emerald-50/60 border border-emerald-100/80">
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="openCategoryDrillDown('smt')"
+                            class="p-1.5 rounded-lg bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-100/80 hover:border-emerald-300 transition-all cursor-pointer text-center group"
+                            title="Klik untuk lihat transaksi SMT"
+                        >
                             <div class="flex items-center justify-center gap-1 mb-0.5">
                                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                 <span class="text-[10px] font-bold text-emerald-700">SMT</span>
                             </div>
-                            <span class="block text-xs font-bold text-slate-800 truncate" :title="formatRupiah(areaConsumption?.smt || 0)">
+                            <span class="block text-xs font-bold text-slate-800 truncate group-hover:text-emerald-900" :title="formatRupiah(areaConsumption?.smt || 0)">
                                 {{ formatShortRupiah(areaConsumption?.smt || 0) }}
                             </span>
-                        </div>
-                        <div class="p-1.5 rounded-lg bg-purple-50/60 border border-purple-100/80">
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="openCategoryDrillDown('common')"
+                            class="p-1.5 rounded-lg bg-purple-50/60 hover:bg-purple-100/80 border border-purple-100/80 hover:border-purple-300 transition-all cursor-pointer text-center group"
+                            title="Klik untuk lihat transaksi Common"
+                        >
                             <div class="flex items-center justify-center gap-1 mb-0.5">
                                 <span class="w-2 h-2 rounded-full bg-violet-500"></span>
                                 <span class="text-[10px] font-bold text-purple-700">Common</span>
                             </div>
-                            <span class="block text-xs font-bold text-slate-800 truncate" :title="formatRupiah(areaConsumption?.common || 0)">
+                            <span class="block text-xs font-bold text-slate-800 truncate group-hover:text-purple-900" :title="formatRupiah(areaConsumption?.common || 0)">
                                 {{ formatShortRupiah(areaConsumption?.common || 0) }}
                             </span>
-                        </div>
+                        </button>
                     </div>
                 </div>
             </div>

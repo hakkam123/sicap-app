@@ -228,7 +228,7 @@ class DashboardController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'type'      => 'required|in:area,part,unassigned',
+            'type'      => 'required|in:area,part,unassigned,category,fa,smt,common',
             'id'        => 'required|string',
             'date_from' => 'nullable|date',
             'date_to'   => 'nullable|date',
@@ -240,7 +240,40 @@ class DashboardController extends Controller
             ->when($request->date_from, fn($q) => $q->whereDate('consumed_at', '>=', $request->date_from))
             ->when($request->date_to,   fn($q) => $q->whereDate('consumed_at', '<=', $request->date_to));
 
-        if ($request->type === 'unassigned') {
+        if ($request->type === 'category' || in_array($request->type, ['fa', 'smt', 'common'])) {
+            $category = strtolower($request->type === 'category' ? $request->id : $request->type);
+
+            $partAreas = DB::table('area_part_number')
+                ->join('areas', 'areas.id', '=', 'area_part_number.area_id')
+                ->whereNull('areas.deleted_at')
+                ->select('area_part_number.part_number_id', 'areas.code')
+                ->get()
+                ->groupBy('part_number_id')
+                ->map(fn($rows) => $rows->pluck('code')->map(fn($c) => strtoupper(trim($c)))->unique()->values()->all());
+
+            $matchedPartIds = [];
+            foreach ($partAreas as $partId => $codes) {
+                $hasFa = in_array('FA', $codes);
+                $hasSmt = in_array('SMT', $codes);
+
+                if ($category === 'common' && $hasFa && $hasSmt) {
+                    $matchedPartIds[] = $partId;
+                } elseif ($category === 'fa' && $hasFa && !$hasSmt) {
+                    $matchedPartIds[] = $partId;
+                } elseif ($category === 'smt' && $hasSmt && !$hasFa) {
+                    $matchedPartIds[] = $partId;
+                }
+            }
+
+            $query->whereIn('part_number_id', $matchedPartIds);
+            $categoryLabel = match ($category) {
+                'fa' => 'FA (Fabrication)',
+                'smt' => 'SMT (Surface Mount)',
+                'common' => 'Common (FA & SMT)',
+                default => strtoupper($category),
+            };
+            $title = "Konsumsi Area — {$categoryLabel}";
+        } elseif ($request->type === 'unassigned') {
             $query->whereNull('area_id');
             $title = 'Consume Tanpa Area (Unassigned)';
         } elseif ($request->type === 'area') {
