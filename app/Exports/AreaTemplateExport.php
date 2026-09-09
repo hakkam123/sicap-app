@@ -6,7 +6,7 @@ use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
-class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
+class AreaTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
 {
     /**
      * @return array
@@ -14,11 +14,9 @@ class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
     public function headings(): array
     {
         return [
-            'pn_baan',
-            'area_code',
-            'machine_code',
-            'qty',
-            'consumed_at',
+            'code',
+            'name',
+            'description',
         ];
     }
 
@@ -29,19 +27,16 @@ class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
     {
         return [
             [
-                'PN-001',
                 'FA',
-                'MC-FA-01',
-                5,
-                now()->format('Y-m-d'),
+                'Final Assembly',
+                'Area perakitan akhir',
             ],
             [
-                'PN-002',
                 'SMT',
-                'MC-SMT-01',
-                2,
-                now()->format('Y-m-d'),
+                'Surface Mount Technology',
+                'Area pemasangan komponen elektronik',
             ],
         ];
     }
 }
+

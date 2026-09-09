@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\ConsumeExport;
+use App\Exports\ConsumeTemplateExport;
 use App\Http\Requests\ConsumeRequest;
+use App\Imports\ConsumeImport;
 use App\Models\Area;
 use App\Models\Consume;
 use App\Models\ImportLog;
@@ -14,6 +17,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ConsumeController extends Controller
 {
@@ -127,5 +132,97 @@ class ConsumeController extends Controller
         $consume->delete();
 
         return redirect()->route('consume.index')->with('success', 'Data consume berhasil dihapus');
+    }
+
+    /**
+     * Export filtered consume records to Excel.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $filters = $request->only(['search', 'area_id', 'machine_id', 'date_from', 'date_to']);
+        $filename = 'consume_report_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(new ConsumeExport($filters), $filename);
+    }
+
+    /**
+     * Import consume records from Excel.
+     */
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'file.required' => 'File Excel wajib dipilih.',
+            'file.mimes' => 'Format file harus .xlsx atau .xls.',
+            'file.max' => 'Ukuran file maksimal 10MB.',
+        ]);
+
+        $importer = new ConsumeImport();
+
+        try {
+            Excel::import($importer, $request->file('file'));
+        } catch (\Throwable $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Gagal memproses file Excel: ' . $e->getMessage(),
+                    'errors' => [$e->getMessage()],
+                ], 422);
+            }
+            return redirect()->back()->with('error', 'Gagal memproses file Excel: ' . $e->getMessage());
+        }
+
+        if ($importer->errorCount > 0 && $importer->successCount === 0) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Import gagal. Terdapat ' . $importer->errorCount . ' baris bermasalah.',
+                    'errors' => $importer->errors,
+                ], 422);
+            }
+            return redirect()->back()->with('error', "Import gagal: {$importer->errorCount} baris tidak valid.")->with('import_errors', $importer->errors);
+        }
+
+        $msg = "Import Consume selesai: {$importer->successCount} data berhasil diproses.";
+        if ($importer->errorCount > 0) {
+            $msg .= " - Terdapat {$importer->errorCount} baris dilewati.";
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'errors' => $importer->errors,
+                'success_count' => $importer->successCount,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
+    }
+
+    /**
+     * Download consume Excel template.
+     */
+    public function downloadTemplate(): BinaryFileResponse
+    {
+        return Excel::download(new ConsumeTemplateExport(), 'template_consume.xlsx');
+    }
+
+    /**
+     * Trigger manual sync from external API via UI.
+     */
+    public function syncApi(\App\Services\ConsumeSyncService $syncService): RedirectResponse
+    {
+        try {
+            $result = $syncService->sync(null, Auth::id());
+
+            if (($result['status'] ?? '') === 'warning') {
+                return redirect()->route('consume.index')->with('warning', $result['message']);
+            }
+
+            $count = $result['synced_count'] ?? 0;
+            return redirect()->route('consume.index')->with('success', "Sinkronisasi API berhasil: {$count} data berhasil disinkronkan.");
+        } catch (\Throwable $e) {
+            return redirect()->route('consume.index')->with('error', "Sinkronisasi API gagal: {$e->getMessage()}");
+        }
     }
 }

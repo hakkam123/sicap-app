@@ -28,7 +28,20 @@ class MappingImport implements ToArray, WithHeadingRow
                 $areaCode = isset($row['area_code']) ? trim((string) $row['area_code']) : '';
                 $machineCode = isset($row['machine_code']) ? trim((string) $row['machine_code']) : '';
 
-                if (empty($pnBaan)) {
+                // Skip completely empty row
+                if ($pnBaan === '' && $areaCode === '' && $machineCode === '') {
+                    continue;
+                }
+
+                if ($pnBaan === '') {
+                    $this->errorCount++;
+                    $this->errors[] = "Baris {$rowNumber}: Kolom 'pn_baan' wajib diisi.";
+                    continue;
+                }
+
+                if ($areaCode === '') {
+                    $this->errorCount++;
+                    $this->errors[] = "Baris {$rowNumber}: Kolom 'area_code' wajib diisi.";
                     continue;
                 }
 
@@ -39,34 +52,31 @@ class MappingImport implements ToArray, WithHeadingRow
                     continue;
                 }
 
-                if (!empty($areaCode)) {
-                    $area = Area::where('code', $areaCode)->first();
-                    if (!$area) {
-                        $this->errorCount++;
-                        $this->errors[] = "Baris {$rowNumber}: Area dengan kode '{$areaCode}' tidak ditemukan.";
-                        continue;
+                $area = Area::where('code', $areaCode)->first();
+                if (!$area) {
+                    $this->errorCount++;
+                    $this->errors[] = "Baris {$rowNumber}: Area dengan kode '{$areaCode}' tidak ditemukan.";
+                    continue;
+                }
+
+                // Attach area to part without detaching existing mappings
+                $partNumber->areas()->syncWithoutDetaching([$area->id]);
+
+                if (!empty($machineCode)) {
+                    $machine = Machine::where('code', $machineCode)
+                        ->where('area_id', $area->id)
+                        ->first();
+
+                    if (!$machine) {
+                        $machine = Machine::where('code', $machineCode)->first();
                     }
 
-                    // Attach area to part without detaching existing ones
-                    $partNumber->areas()->syncWithoutDetaching([$area->id]);
-
-                    if (!empty($machineCode)) {
-                        $machine = Machine::where('code', $machineCode)
-                            ->where('area_id', $area->id)
-                            ->first();
-
-                        if (!$machine) {
-                            // Fallback search by code only
-                            $machine = Machine::where('code', $machineCode)->first();
-                        }
-
-                        if ($machine) {
-                            $partNumber->machines()->syncWithoutDetaching([$machine->id]);
-                        } else {
-                            $this->errorCount++;
-                            $this->errors[] = "Baris {$rowNumber}: Machine '{$machineCode}' tidak ditemukan di area '{$areaCode}'.";
-                            continue;
-                        }
+                    if ($machine) {
+                        $partNumber->machines()->syncWithoutDetaching([$machine->id]);
+                    } else {
+                        $this->errorCount++;
+                        $this->errors[] = "Baris {$rowNumber}: Machine '{$machineCode}' tidak ditemukan di area '{$areaCode}'.";
+                        continue;
                     }
                 }
 
@@ -75,4 +85,3 @@ class MappingImport implements ToArray, WithHeadingRow
         });
     }
 }
-

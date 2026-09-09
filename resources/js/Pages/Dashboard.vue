@@ -42,9 +42,21 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    trendData: {
+        type: Array,
+        default: () => [],
+    },
+    topParts: {
+        type: Array,
+        default: () => [],
+    },
     topConsumes: {
         type: Array,
         default: () => [],
+    },
+    areaConsumption: {
+        type: Object,
+        default: () => ({ fa: 0, smt: 0, common: 0 }),
     },
     byArea: {
         type: Array,
@@ -79,6 +91,9 @@ const filterForm = ref({
     date_to: props.filters.date_to || '',
 });
 
+// Daily Trend Computed (handles trendData and chartData)
+const dailyTrend = computed(() => (props.trendData && props.trendData.length > 0) ? props.trendData : props.chartData);
+
 // Dependent Machine Dropdown Data
 const machineOptions = ref([...props.machines]);
 const isLoadingMachines = ref(false);
@@ -110,7 +125,10 @@ const handleAreaChange = async () => {
     }
 };
 
+const isLoading = ref(false);
+
 const applyFilters = () => {
+    isLoading.value = true;
     router.get(
         route('dashboard'),
         {
@@ -123,6 +141,9 @@ const applyFilters = () => {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            onFinish: () => {
+                isLoading.value = false;
+            },
         }
     );
 };
@@ -134,7 +155,13 @@ const resetFilters = () => {
         date_from: '',
         date_to: '',
     };
-    router.get(route('dashboard'), {}, { preserveState: false });
+    isLoading.value = true;
+    router.get(route('dashboard'), {}, {
+        preserveState: false,
+        onFinish: () => {
+            isLoading.value = false;
+        },
+    });
 };
 
 // Formatters (Always Positive)
@@ -153,17 +180,34 @@ const formatNumber = (val) => {
     return new Intl.NumberFormat('id-ID').format(Math.abs(Number(val)));
 };
 
-// Chart Data & Options (Facing upwards with positive Qty)
+// Format Rupiah Singkat untuk Sumbu Y (contoh: Rp 1,2jt, Rp 500rb)
+const formatShortRupiah = (val) => {
+    val = Math.abs(Number(val));
+    if (val === 0) return 'Rp 0';
+    if (val >= 1_000_000_000) {
+        return 'Rp ' + (val / 1_000_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'M';
+    }
+    if (val >= 1_000_000) {
+        return 'Rp ' + (val / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'jt';
+    }
+    if (val >= 1_000) {
+        return 'Rp ' + (val / 1_000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'rb';
+    }
+    return 'Rp ' + val.toLocaleString('id-ID');
+};
+
+// Chart Data & Options: Tren Konsumsi Harian (Nominal Rupiah)
 const chartConfig = computed(() => {
-    const labels = props.chartData.map((d) => d.date);
-    const dataQty = props.chartData.map((d) => Math.abs(d.qty));
+    const rawData = dailyTrend.value || [];
+    const labels = rawData.map((d) => d.date);
+    const dataAmount = rawData.map((d) => Math.abs(Number(d.amount || 0)));
 
     return {
         data: {
             labels,
             datasets: [
                 {
-                    label: 'Qty Terpakai',
+                    label: 'Nominal Pemakaian (IDR)',
                     backgroundColor: 'rgba(59, 130, 246, 0.12)',
                     borderColor: '#2563eb',
                     borderWidth: 2.5,
@@ -171,11 +215,12 @@ const chartConfig = computed(() => {
                     pointBorderColor: '#fff',
                     pointHoverBackgroundColor: '#fff',
                     pointHoverBorderColor: '#1d4ed8',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    hitRadius: 10,
                     fill: true,
                     tension: 0.3,
-                    data: dataQty,
+                    data: dataAmount,
                 },
             ],
         },
@@ -193,13 +238,36 @@ const chartConfig = computed(() => {
                 tooltip: {
                     callbacks: {
                         label: function (context) {
-                            const item = props.chartData[context.dataIndex];
-                            const qtyStr = `Qty Terpakai: ${formatNumber(item.qty)}`;
-                            const amtStr = item.amount ? ` (Nominal: ${formatRupiah(item.amount)})` : '';
-                            return `${qtyStr}${amtStr}`;
+                            const item = rawData[context.dataIndex];
+                            const amtStr = `Nominal: ${formatRupiah(item.amount)}`;
+                            const qtyStr = item.qty !== undefined ? ` (Qty: ${formatNumber(item.qty)})` : '';
+                            return `${amtStr}${qtyStr}`;
+                        },
+                        afterLabel: function () {
+                            return 'Klik untuk lihat laporan';
                         },
                     },
                 },
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const idx = elements[0].index;
+                    const item = rawData[idx];
+                    if (item && item.date) {
+                        router.visit(route('reports.index'), {
+                            method: 'get',
+                            data: {
+                                date_from: item.date,
+                                date_to: item.date,
+                                area_id: filterForm.value.area_id || '',
+                                machine_id: filterForm.value.machine_id || '',
+                            },
+                        });
+                    }
+                }
+            },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
             scales: {
                 x: {
@@ -210,15 +278,15 @@ const chartConfig = computed(() => {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Qty Terpakai',
+                        text: 'Nominal Pemakaian (IDR)',
                         font: { size: 11, weight: '600' },
                         color: '#64748b',
                     },
                     grid: { color: 'rgba(226, 232, 240, 0.8)' },
                     ticks: {
                         font: { size: 11 },
-                        callback: function(value) {
-                            return Math.abs(value);
+                        callback: function (value) {
+                            return formatShortRupiah(value);
                         },
                     },
                 },
@@ -227,96 +295,97 @@ const chartConfig = computed(() => {
     };
 });
 
-// Bar Chart: Perbandingan Konsumsi per Area
+// Vertical Bar Chart: Konsumsi per Area (FA, SMT, Common)
 const barChartRef = ref(null);
 
-const barChartConfig = computed(() => ({
-    data: {
-        labels: props.byArea.map((a) => a.area_code || a.area_name),
-        datasets: [
-            {
-                label: 'Total Qty Terpakai',
-                data: props.byArea.map((a) => Math.abs(a.total_qty)),
-                backgroundColor: props.byArea.map((a, i) => {
-                    if (!a.area_id) return 'rgba(148,163,184,0.8)'; // gray for unassigned
-                    const colors = [
-                        'rgba(37,99,235,0.8)',   // blue
-                        'rgba(16,185,129,0.8)',  // green
-                        'rgba(245,158,11,0.8)',  // amber
-                        'rgba(239,68,68,0.8)',   // red
-                        'rgba(139,92,246,0.8)',  // purple
-                        'rgba(20,184,166,0.8)',  // teal
-                    ];
-                    return colors[i % colors.length];
-                }),
-                borderRadius: 6,
-                borderSkipped: false,
-                maxBarThickness: 28,
-            },
-        ],
-    },
-    options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-            mode: 'index',
-            axis: 'y',
-            intersect: false,
+const areaBarChartConfig = computed(() => {
+    const faAmount = Math.abs(Number(props.areaConsumption?.fa || 0));
+    const smtAmount = Math.abs(Number(props.areaConsumption?.smt || 0));
+    const commonAmount = Math.abs(Number(props.areaConsumption?.common || 0));
+
+    return {
+        data: {
+            labels: ['FA', 'SMT', 'Common'],
+            datasets: [
+                {
+                    label: 'Nominal Konsumsi',
+                    data: [faAmount, smtAmount, commonAmount],
+                    backgroundColor: [
+                        '#3b82f6', // FA (blue-500)
+                        '#10b981', // SMT (emerald-500)
+                        '#8b5cf6', // Common (violet-500)
+                    ],
+                    borderColor: [
+                        '#2563eb',
+                        '#059669',
+                        '#7c3aed',
+                    ],
+                    borderWidth: 1.5,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    maxBarThickness: 48,
+                },
+            ],
         },
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                callbacks: {
-                    label: (ctx) => {
-                        const item = props.byArea[ctx.dataIndex];
-                        return [
-                            `Qty: ${formatNumber(item.total_qty)}`,
-                            `Nominal: ${formatRupiah(item.total_amount)}`,
-                            `Frekuensi: ${item.total_count} transaksi`,
-                        ];
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function (ctx) {
+                            return `Nominal: ${formatRupiah(ctx.raw)}`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 12, weight: '700' },
+                        color: '#334155',
+                    },
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Nominal (IDR)',
+                        font: { size: 10, weight: '600' },
+                        color: '#64748b',
+                    },
+                    grid: { color: 'rgba(226, 232, 240, 0.8)' },
+                    ticks: {
+                        font: { size: 11 },
+                        callback: function (value) {
+                            return formatShortRupiah(value);
+                        },
                     },
                 },
             },
         },
-        scales: {
-            x: {
-                beginAtZero: true,
-                grid: { color: 'rgba(226,232,240,0.8)' },
-                ticks: {
-                    font: { size: 10 },
-                    precision: 0,
-                },
-            },
-            y: {
-                grid: { display: false },
-                ticks: {
-                    autoSkip: false,
-                    font: { size: 10 },
-                },
-            },
-        },
-        onClick: (event, elements) => {
-            if (elements.length > 0) {
-                const idx = elements[0].index;
-                const area = props.byArea[idx];
-                openAreaDrillDown(area);
-            }
-        },
-        onHover: (event, elements) => {
-            event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-        },
-    },
-}));
+    };
+});
+
+const barChartConfig = areaBarChartConfig;
 
 // Drill-down State & Actions
 const drillDown = ref({
     show: false,
     loading: false,
+    type: '',
+    id: '',
     title: '',
     rows: [],
     total_qty: 0,
     total_amount: 0,
+    page: 1,
+    last_page: 1,
+    total: 0,
+    from: 0,
+    to: 0,
 });
 
 const openAreaDrillDown = async (area) => {
@@ -325,31 +394,48 @@ const openAreaDrillDown = async (area) => {
     drillDown.value = {
         show: true,
         loading: true,
+        type,
+        id,
         title: area.area_name || area.area_code,
         rows: [],
         total_qty: 0,
         total_amount: 0,
+        page: 1,
+        last_page: 1,
+        total: 0,
+        from: 0,
+        to: 0,
     };
-    await fetchDrillDown(type, id);
+    await fetchDrillDown(type, id, 1);
 };
 
 const openPartDrillDown = async (item) => {
     drillDown.value = {
         show: true,
         loading: true,
+        type: 'part',
+        id: item.part_number_id,
         title: item.pn_baan,
         rows: [],
         total_qty: 0,
         total_amount: 0,
+        page: 1,
+        last_page: 1,
+        total: 0,
+        from: 0,
+        to: 0,
     };
-    await fetchDrillDown('part', item.part_number_id);
+    await fetchDrillDown('part', item.part_number_id, 1);
 };
 
-const fetchDrillDown = async (type, id) => {
+const fetchDrillDown = async (type, id, pageNum = 1) => {
+    drillDown.value.loading = true;
     try {
         const params = new URLSearchParams({
             type,
             id,
+            page: pageNum,
+            per_page: 15,
             ...(filterForm.value.date_from && { date_from: filterForm.value.date_from }),
             ...(filterForm.value.date_to && { date_to: filterForm.value.date_to }),
         });
@@ -360,7 +446,19 @@ const fetchDrillDown = async (type, id) => {
             },
         });
         const data = await res.json();
-        drillDown.value = { ...drillDown.value, loading: false, ...data };
+        drillDown.value = {
+            ...drillDown.value,
+            loading: false,
+            title: data.title,
+            rows: data.rows,
+            total_qty: data.total_qty,
+            total_amount: data.total_amount,
+            page: data.pagination ? data.pagination.current_page : 1,
+            last_page: data.pagination ? data.pagination.last_page : 1,
+            total: data.pagination ? data.pagination.total : data.rows.length,
+            from: data.pagination ? data.pagination.from : 1,
+            to: data.pagination ? data.pagination.to : data.rows.length,
+        };
     } catch {
         drillDown.value.loading = false;
     }
@@ -370,21 +468,29 @@ const closeDrillDown = () => {
     drillDown.value.show = false;
 };
 
-// Top 10 Consume Sort
+// Top 10 Consume Sort by Total Amount
 const topConsumeSort = ref('desc');
 
+const topItems = computed(() =>
+    (props.topParts && props.topParts.length > 0)
+        ? props.topParts
+        : (props.topConsumes || [])
+);
+
 const sortedTopConsumes = computed(() => {
-    const data = [...(props.topConsumes || [])];
+    const data = [...topItems.value];
 
     return data.sort((a, b) => {
-        const qtyA = Number(a.total_qty || 0);
-        const qtyB = Number(b.total_qty || 0);
+        const amountA = Number(a.total_amount || 0);
+        const amountB = Number(b.total_amount || 0);
 
         return topConsumeSort.value === 'asc'
-            ? qtyA - qtyB
-            : qtyB - qtyA;
+            ? amountA - amountB
+            : amountB - amountA;
     });
 });
+
+
 </script>
 
 <template>
@@ -477,14 +583,20 @@ const sortedTopConsumes = computed(() => {
                         <PrimaryButton
                             type="button"
                             @click="applyFilters"
-                            class="flex-1 justify-center text-xs py-2 bg-slate-900 hover:bg-slate-800"
+                            :disabled="isLoading"
+                            class="flex-1 justify-center text-xs py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-60"
                         >
-                            Terapkan
+                            <svg v-if="isLoading" class="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            {{ isLoading ? 'Memuat...' : 'Terapkan' }}
                         </PrimaryButton>
                         <SecondaryButton
                             type="button"
                             @click="resetFilters"
-                            class="text-xs py-2"
+                            :disabled="isLoading"
+                            class="text-xs py-2 disabled:opacity-60"
                             title="Reset Filter"
                         >
                             Reset
@@ -493,6 +605,15 @@ const sortedTopConsumes = computed(() => {
                 </div>
             </div>
 
+            <!-- Loading indicator bar -->
+            <div v-if="isLoading" class="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
+                <div class="bg-blue-600 h-full animate-pulse w-full"></div>
+            </div>
+
+            <div
+                :class="{ 'opacity-60 pointer-events-none transition-opacity duration-200': isLoading }"
+                class="space-y-6"
+            >
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- Total Qty -->
             <div class="bg-white rounded-lg border border-slate-200 px-5 py-4">
@@ -614,14 +735,14 @@ const sortedTopConsumes = computed(() => {
                                 Tren Konsumsi Harian
                             </h3>
                             <p class="text-xs text-slate-400 mt-0.5">
-                                Pergerakan kuantitas sparepart terpakai per tanggal (grafik menghadap ke atas).
+                                Pergerakan nominal biaya pemakaian sparepart per tanggal (klik titik untuk melihat laporan detail).
                             </p>
                         </div>
                     </div>
 
                     <div class="h-64 w-full">
                         <Line
-                            v-if="chartData.length > 0"
+                            v-if="dailyTrend.length > 0"
                             :data="chartConfig.data"
                             :options="chartConfig.options"
                         />
@@ -638,30 +759,64 @@ const sortedTopConsumes = computed(() => {
                 </div>
 
                 <!-- Bar chart: col-span-1 (1/3 lebar) -->
-                <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-800">Konsumsi per Area</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">
-                                Klik bar untuk detail.
-                            </p>
+                <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800">Konsumsi Area</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">
+                                    Total nominal berdasarkan part mapping FA, SMT, & Common.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="h-64 w-full">
+                            <Bar
+                                v-if="((areaConsumption?.fa || 0) + (areaConsumption?.smt || 0) + (areaConsumption?.common || 0)) > 0"
+                                :data="barChartConfig.data"
+                                :options="barChartConfig.options"
+                                ref="barChartRef"
+                            />
+                            <div
+                                v-else
+                                class="h-full flex flex-col items-center justify-center text-slate-400 text-xs"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                                </svg>
+                                Tidak ada data konsumsi pada rentang ini.
+                            </div>
                         </div>
                     </div>
-                    <div class="h-64 w-full">
-                        <Bar
-                            v-if="byArea && byArea.length > 0"
-                            :data="barChartConfig.data"
-                            :options="barChartConfig.options"
-                            ref="barChartRef"
-                        />
-                        <div
-                            v-else
-                            class="h-full flex flex-col items-center justify-center text-slate-400 text-xs"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                            </svg>
-                            Tidak ada data area pada filter ini.
+
+                    <!-- Mini Summary per Area -->
+                    <div class="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2 text-center">
+                        <div class="p-1.5 rounded-lg bg-blue-50/60 border border-blue-100/80">
+                            <div class="flex items-center justify-center gap-1 mb-0.5">
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span class="text-[10px] font-bold text-blue-700">FA</span>
+                            </div>
+                            <span class="block text-xs font-bold text-slate-800 truncate" :title="formatRupiah(areaConsumption?.fa || 0)">
+                                {{ formatShortRupiah(areaConsumption?.fa || 0) }}
+                            </span>
+                        </div>
+                        <div class="p-1.5 rounded-lg bg-emerald-50/60 border border-emerald-100/80">
+                            <div class="flex items-center justify-center gap-1 mb-0.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span class="text-[10px] font-bold text-emerald-700">SMT</span>
+                            </div>
+                            <span class="block text-xs font-bold text-slate-800 truncate" :title="formatRupiah(areaConsumption?.smt || 0)">
+                                {{ formatShortRupiah(areaConsumption?.smt || 0) }}
+                            </span>
+                        </div>
+                        <div class="p-1.5 rounded-lg bg-purple-50/60 border border-purple-100/80">
+                            <div class="flex items-center justify-center gap-1 mb-0.5">
+                                <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+                                <span class="text-[10px] font-bold text-purple-700">Common</span>
+                            </div>
+                            <span class="block text-xs font-bold text-slate-800 truncate" :title="formatRupiah(areaConsumption?.common || 0)">
+                                {{ formatShortRupiah(areaConsumption?.common || 0) }}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -677,14 +832,14 @@ const sortedTopConsumes = computed(() => {
                                 Top 10 Konsumsi per Part Number
                             </h3>
                             <p class="text-[11px] text-slate-400 mt-1">
-                                Berdasarkan total kuantitas sparepart yang terpakai.
+                                Berdasarkan total nominal nilai pemakaian (amount) sparepart.
                             </p>
                         </div>
 
                         <!-- Sort Control -->
                         <div class="flex items-center gap-2">
                             <span class="text-[11px] font-medium text-slate-400">
-                                Urutkan Qty
+                                Urutkan
                             </span>
 
                             <div class="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
@@ -697,7 +852,7 @@ const sortedTopConsumes = computed(() => {
                                             ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
                                             : 'text-slate-500 hover:text-slate-800'
                                     ]"
-                                    title="Quantity terbesar ke terkecil"
+                                    title="Nominal terbesar ke terkecil"
                                 >
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -725,7 +880,7 @@ const sortedTopConsumes = computed(() => {
                                             ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
                                             : 'text-slate-500 hover:text-slate-800'
                                     ]"
-                                    title="Quantity terkecil ke terbesar"
+                                    title="Nominal terkecil ke terbesar"
                                 >
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -755,16 +910,16 @@ const sortedTopConsumes = computed(() => {
                             <tr class="border-b border-slate-200 bg-slate-50/70">
                                 <th
                                     scope="col"
-                                    class="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider w-14"
+                                    class="px-5 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-14"
                                 >
-                                    #
+                                    No.
                                 </th>
 
                                 <th
                                     scope="col"
                                     class="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider"
                                 >
-                                    Part Number
+                                    PN BAAN
                                 </th>
 
                                 <th
@@ -785,14 +940,14 @@ const sortedTopConsumes = computed(() => {
                                     scope="col"
                                     class="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider"
                                 >
-                                    Qty
+                                    Total Qty
                                 </th>
 
                                 <th
                                     scope="col"
                                     class="px-5 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider"
                                 >
-                                    Nilai Pemakaian
+                                    Total Amount
                                 </th>
                             </tr>
                         </thead>
@@ -841,27 +996,16 @@ const sortedTopConsumes = computed(() => {
                                 class="group hover:bg-slate-50/70 transition-colors cursor-pointer"
                                 title="Klik untuk lihat detail"
                             >
-                                <!-- Ranking -->
-                                <td class="px-5 py-3">
-                                    <span
-                                        :class="[
-                                            'inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold',
-                                            idx === 0
-                                                ? 'bg-slate-900 text-white'
-                                                : idx === 1
-                                                    ? 'bg-slate-200 text-slate-700'
-                                                    : idx === 2
-                                                        ? 'bg-slate-100 text-slate-600'
-                                                        : 'text-slate-400'
-                                        ]"
-                                    >
+                                <!-- Nomor Urut (Plain, tanpa badge warna) -->
+                                <td class="px-5 py-3 text-center">
+                                    <span class="text-xs font-semibold text-slate-500 tabular-nums">
                                         {{ idx + 1 }}
                                     </span>
                                 </td>
 
-                                <!-- PN -->
+                                <!-- PN (Badge Mono) -->
                                 <td class="px-4 py-3">
-                                    <span class="font-mono text-xs font-semibold text-slate-800">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80">
                                         {{ item.pn_baan }}
                                     </span>
                                 </td>
@@ -908,12 +1052,15 @@ const sortedTopConsumes = computed(() => {
                     class="px-5 py-3 border-t border-slate-100 bg-slate-50/40"
                 >
                     <p class="text-[10px] text-slate-400">
-                        Menampilkan {{ sortedTopConsumes.length }} part dengan konsumsi tertinggi
+                        Menampilkan {{ sortedTopConsumes.length }} part dengan nilai pemakaian tertinggi
                         berdasarkan filter yang dipilih.
                     </p>
+
+
                 </div>
             </div>
 
+            </div>
         </div>
 
         <!-- Drill-down Modal -->
@@ -943,17 +1090,19 @@ const sortedTopConsumes = computed(() => {
                     </div>
 
                     <!-- Summary -->
-                    <div class="px-6 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-6">
-                        <div>
-                            <span class="text-xs text-slate-500">Total Qty:</span>
-                            <span class="text-xs font-bold text-slate-900 ml-1">{{ formatNumber(drillDown.total_qty) }}</span>
+                    <div class="px-6 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex flex-wrap gap-6">
+                            <div>
+                                <span class="text-xs text-slate-500">Total Qty:</span>
+                                <span class="text-xs font-bold text-slate-900 ml-1">{{ formatNumber(drillDown.total_qty) }}</span>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-500">Total Nominal:</span>
+                                <span class="text-xs font-bold text-slate-900 ml-1">{{ formatRupiah(drillDown.total_amount) }}</span>
+                            </div>
                         </div>
-                        <div>
-                            <span class="text-xs text-slate-500">Total Nominal:</span>
-                            <span class="text-xs font-bold text-slate-900 ml-1">{{ formatRupiah(drillDown.total_amount) }}</span>
-                        </div>
-                        <div>
-                            <span class="text-xs text-slate-500">Menampilkan maks. 50 transaksi terbaru</span>
+                        <div class="text-xs text-slate-500 font-medium">
+                            Total <span class="font-bold text-slate-800">{{ drillDown.total }}</span> transaksi
                         </div>
                     </div>
 
@@ -1010,6 +1159,37 @@ const sortedTopConsumes = computed(() => {
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Pagination Footer -->
+                    <div
+                        v-if="drillDown.last_page > 1"
+                        class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between"
+                    >
+                        <p class="text-xs text-slate-500">
+                            Menampilkan <span class="font-medium text-slate-800">{{ drillDown.from || 0 }}</span> - <span class="font-medium text-slate-800">{{ drillDown.to || 0 }}</span> dari <span class="font-medium text-slate-800">{{ drillDown.total }}</span> transaksi
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                @click="fetchDrillDown(drillDown.type, drillDown.id, drillDown.page - 1)"
+                                :disabled="drillDown.page <= 1 || drillDown.loading"
+                                class="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-md bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                Sebelumnya
+                            </button>
+                            <span class="text-xs text-slate-600 font-medium px-1">
+                                {{ drillDown.page }} / {{ drillDown.last_page }}
+                            </span>
+                            <button
+                                type="button"
+                                @click="fetchDrillDown(drillDown.type, drillDown.id, drillDown.page + 1)"
+                                :disabled="drillDown.page >= drillDown.last_page || drillDown.loading"
+                                class="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-md bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                Selanjutnya
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -10,7 +10,7 @@ import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import { Search, RotateCcw, Plus, X } from 'lucide-vue-next';
+import { Search, RotateCcw, Plus, X, Upload, Download, AlertCircle } from 'lucide-vue-next';
 
 const page = usePage();
 const isAdmin = computed(() => {
@@ -139,6 +139,83 @@ const doDelete = () => {
         },
     });
 };
+
+// ==========================================
+// 5. IMPORT EXCEL MODAL
+// ==========================================
+const isImportModalOpen = ref(false);
+const importFile = ref(null);
+const importInputRef = ref(null);
+const isUploading = ref(false);
+const importErrors = ref([]);
+
+const openImportModal = () => {
+    importFile.value = null;
+    importErrors.value = [];
+    isUploading.value = false;
+    if (importInputRef.value) importInputRef.value.value = '';
+    isImportModalOpen.value = true;
+};
+
+const closeImportModal = () => {
+    if (isUploading.value) return;
+    isImportModalOpen.value = false;
+    importFile.value = null;
+    importErrors.value = [];
+    if (importInputRef.value) importInputRef.value.value = '';
+};
+
+const handleImportFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        importFile.value = file;
+        importErrors.value = [];
+    }
+};
+
+const submitImport = async () => {
+    if (!importFile.value || isUploading.value) return;
+
+    isUploading.value = true;
+    importErrors.value = [];
+
+    const formData = new FormData();
+    formData.append('file', importFile.value);
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+    try {
+        const response = await fetch(route('areas.import'), {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+            },
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            if (Array.isArray(result.errors) && result.errors.length) {
+                importErrors.value = result.errors;
+            } else if (result.message) {
+                importErrors.value = [result.message];
+            } else {
+                importErrors.value = ['Gagal memproses file import. Silakan periksa format data.'];
+            }
+            return;
+        }
+
+        closeImportModal();
+        router.reload({ preserveScroll: true });
+    } catch (err) {
+        importErrors.value = [err.message || 'Terjadi kesalahan saat mengunggah file.'];
+    } finally {
+        isUploading.value = false;
+    }
+};
 </script>
 
 <template>
@@ -228,8 +305,17 @@ const doDelete = () => {
                     <!-- ACTION BUTTON — KANAN -->
                     <div
                         v-if="isAdmin"
-                        class="flex items-end gap-1 ml-auto"
+                        class="flex items-end gap-2 ml-auto"
                     >
+                        <button
+                            type="button"
+                            @click="openImportModal"
+                            class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-md hover:bg-emerald-700 transition"
+                        >
+                            <Upload class="w-3.5 h-3.5 text-white" />
+                            Import Excel
+                        </button>
+
                         <button
                             type="button"
                             @click="openCreateModal"
@@ -351,6 +437,80 @@ const doDelete = () => {
                         <PrimaryButton :disabled="form.processing">
                             {{ isEditing ? 'Simpan Perubahan' : 'Tambah Area' }}
                         </PrimaryButton>
+                    </div>
+                </form>
+            </div>
+        </Modal>
+
+        <!-- MODAL IMPORT EXCEL AREA -->
+        <Modal :show="isImportModalOpen" @close="closeImportModal" max-width="lg">
+            <div class="p-6 sm:p-7 space-y-5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">
+                            Import Master Data Area
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Unggah file Excel untuk menambah atau memperbarui data area secara massal.
+                        </p>
+                    </div>
+                    <button @click="closeImportModal" :disabled="isUploading" class="text-slate-400 hover:text-slate-600 p-1">
+                        <X class="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div class="p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-emerald-900">Format Kolom Excel:</p>
+                        <p class="text-[11px] text-emerald-700 font-mono mt-0.5">code | name | description</p>
+                    </div>
+                    <a
+                        :href="route('areas.template')"
+                        class="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 underline"
+                        download
+                    >
+                        <Download class="w-3.5 h-3.5" />
+                        Download Template
+                    </a>
+                </div>
+
+                <!-- Error Messages Box -->
+                <div v-if="importErrors.length > 0" class="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                    <div class="flex items-center gap-1.5 font-bold text-red-800">
+                        <AlertCircle class="w-4 h-4 flex-shrink-0" />
+                        <span>Terdapat kesalahan pada data import:</span>
+                    </div>
+                    <ul class="list-disc list-inside space-y-0.5 pl-1 text-[11px]">
+                        <li v-for="(err, idx) in importErrors" :key="idx">{{ err }}</li>
+                    </ul>
+                </div>
+
+                <form @submit.prevent="submitImport" class="space-y-4">
+                    <div>
+                        <InputLabel for="area_import_file" value="Pilih File Excel (.xlsx, .xls) *" />
+                        <input
+                            ref="importInputRef"
+                            id="area_import_file"
+                            type="file"
+                            accept=".xlsx, .xls"
+                            @change="handleImportFileChange"
+                            class="mt-1 block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                            required
+                        />
+                    </div>
+
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <SecondaryButton type="button" @click="closeImportModal" :disabled="isUploading">
+                            Batal
+                        </SecondaryButton>
+                        <button
+                            type="submit"
+                            :disabled="!importFile || isUploading"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Upload class="w-3.5 h-3.5" />
+                            <span>{{ isUploading ? 'Mengimpor...' : 'Import Data' }}</span>
+                        </button>
                     </div>
                 </form>
             </div>

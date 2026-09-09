@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -25,12 +25,45 @@ const dismissedFlash = ref({
     error: false,
 });
 
+let successTimer = null;
+let errorTimer = null;
+
+watch(
+    () => page.props.flash?.success,
+    (val) => {
+        if (val) {
+            dismissedFlash.value.success = false;
+            if (successTimer) clearTimeout(successTimer);
+            successTimer = setTimeout(() => {
+                dismissedFlash.value.success = true;
+            }, 5000);
+        }
+    },
+    { immediate: true }
+);
+
+watch(
+    () => page.props.flash?.error,
+    (val) => {
+        if (val) {
+            dismissedFlash.value.error = false;
+            if (errorTimer) clearTimeout(errorTimer);
+            errorTimer = setTimeout(() => {
+                dismissedFlash.value.error = true;
+            }, 7000);
+        }
+    },
+    { immediate: true }
+);
+
 const dismissSuccess = () => {
     dismissedFlash.value.success = true;
+    if (successTimer) clearTimeout(successTimer);
 };
 
 const dismissError = () => {
     dismissedFlash.value.error = true;
+    if (errorTimer) clearTimeout(errorTimer);
 };
 
 const logout = () => {
@@ -183,6 +216,62 @@ const logout = () => {
                     </svg>
 
                     <span>Consume</span>
+                </Link>
+
+                <!-- Laporan -->
+                <Link
+                    :href="route('reports.index')"
+                    :class="[
+                        'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all',
+                        route().current('reports.*')
+                            ? 'bg-white/10 text-white shadow-sm'
+                            : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    ]"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 text-white shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                    </svg>
+
+                    <span>Laporan</span>
+                </Link>
+
+                <!-- Riwayat Import -->
+                <Link
+                    :href="route('import-logs.index')"
+                    :class="[
+                        'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all',
+                        route().current('import-logs.*')
+                            ? 'bg-white/10 text-white shadow-sm'
+                            : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    ]"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 text-white shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                    </svg>
+
+                    <span>Riwayat Import</span>
                 </Link>
 
 
@@ -507,6 +596,10 @@ const logout = () => {
                                     {{ user?.email }}
                                 </p>
                             </div>
+
+                            <DropdownLink :href="route('profile.edit')">
+                                Profil Saya
+                            </DropdownLink>
 
                             <DropdownLink
                                 :href="route('logout')"

@@ -20,7 +20,7 @@ class ConsumeApiController extends Controller
     /**
      * Synchronize consume records from external systems (Batch Sync).
      */
-    public function sync(Request $request): JsonResponse
+    public function sync(Request $request, \App\Services\ConsumeSyncService $syncService): JsonResponse
     {
         // 1. Validasi struktur payload (Maksimal 500 item per request untuk mencegah memory & database lock contention)
         $validator = Validator::make($request->all(), [
@@ -68,125 +68,20 @@ class ConsumeApiController extends Controller
         }
 
         $items = $request->input('consumes');
-        $businessErrors = [];
-        $recordsToInsert = [];
         $userId = Auth::id();
-        $now = now();
 
-        // 2. Optimasi Query: Pre-fetch master data (Bulk Select) untuk mencegah N+1 Query
-        $pnCodes = collect($items)->pluck('part_number')->map(fn($v) => trim((string)$v))->unique()->filter()->values()->all();
-        $areaCodes = collect($items)->pluck('area_code')->map(fn($v) => trim((string)$v))->unique()->filter()->values()->all();
-        $machineCodes = collect($items)->pluck('machine_code')->map(fn($v) => trim((string)$v))->unique()->filter()->values()->all();
-
-        // Map data in-memory menggunakan keyBy untuk pencarian O(1)
-        $partMap = PartNumber::whereIn('pn_baan', $pnCodes)->get()->keyBy('pn_baan');
-        $areaMap = !empty($areaCodes) ? Area::whereIn('code', $areaCodes)->get()->keyBy('code') : collect();
-        $machineMap = !empty($machineCodes) ? Machine::whereIn('code', $machineCodes)->get()->keyBy('code') : collect();
-
-        // 3. Validasi aturan bisnis dan susun data untuk bulk insert
-        foreach ($items as $index => $item) {
-            $rowNum = $index + 1;
-            $pnCode = trim((string) $item['part_number']);
-            $areaCode = isset($item['area_code']) && trim((string)$item['area_code']) !== ''
-                ? trim((string)$item['area_code'])
-                : null;
-            $machineCode = isset($item['machine_code']) && trim((string)$item['machine_code']) !== ''
-                ? trim((string)$item['machine_code'])
-                : null;
-
-            // Validasi Part Number
-            $part = $partMap->get($pnCode);
-            if (!$part) {
-                $businessErrors[] = [
-                    'row' => $rowNum,
-                    'field' => 'part_number',
-                    'message' => "Part number '{$pnCode}' tidak ditemukan di master data.",
-                ];
-            }
-
-            // Validasi Area (jika diberikan)
-            $area = null;
-            if ($areaCode !== null) {
-                $area = $areaMap->get($areaCode);
-                if (!$area) {
-                    $businessErrors[] = [
-                        'row' => $rowNum,
-                        'field' => 'area_code',
-                        'message' => "Area dengan kode '{$areaCode}' tidak ditemukan.",
-                    ];
-                }
-            }
-
-            // Validasi Machine (jika diberikan)
-            $machine = null;
-            if ($machineCode !== null) {
-                $machine = $machineMap->get($machineCode);
-                if (!$machine) {
-                    $businessErrors[] = [
-                        'row' => $rowNum,
-                        'field' => 'machine_code',
-                        'message' => "Machine dengan kode '{$machineCode}' tidak ditemukan.",
-                    ];
-                }
-            }
-
-            // Validasi kesesuaian relasi Machine dengan Area
-            if ($machine && $area && $machine->area_id !== $area->id) {
-                $businessErrors[] = [
-                    'row' => $rowNum,
-                    'field' => 'machine_code',
-                    'message' => "Machine '{$machineCode}' tidak berada di Area '{$areaCode}'.",
-                ];
-            }
-
-            // Jika ditemukan error pada baris ini, lanjutkan iterasi pengecekan baris lainnya
-            if (!empty($businessErrors)) {
-                continue;
-            }
-
-            // Kalkulasi amount jika null
-            $amount = isset($item['amount']) && $item['amount'] !== null && $item['amount'] !== ''
-                ? (float) $item['amount']
-                : null;
-
-            if ($amount === null && $part && $part->price_per_unit !== null) {
-                $amount = (float) $part->price_per_unit * abs((int) $item['quantity']);
-            }
-
-            // Siapkan row data (Sertakan ULID dan Timestamps karena insert query builder tidak memicu Eloquent events)
-            $recordsToInsert[] = [
-                'id' => (string) Str::ulid(),
-                'part_number_id' => $part->id,
-                'area_id' => $area?->id ?? $machine?->area_id ?? null,
-                'machine_id' => $machine?->id ?? null,
-                'quantity' => (int) $item['quantity'],
-                'amount' => $amount,
-                'consumed_at' => $item['consumed_at'],
-                'source' => 'api',
-                'created_by' => $userId,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-
-        // Jika ada kegagalan validasi master data, batalkan penyimpanan
-        if (!empty($businessErrors)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $businessErrors,
-            ], 422);
-        }
-
-        // 4. Eksekusi Database Transaction & Bulk Insert per 100 record (mengurangi overhead & lock waktu di SQL Server)
         try {
-            DB::transaction(function () use ($recordsToInsert) {
-                foreach (array_chunk($recordsToInsert, 100) as $chunk) {
-                    Consume::insert($chunk);
-                }
-            });
+            $result = $syncService->processItems($items, $userId);
 
-            $totalCount = count($recordsToInsert);
+            if (!empty($result['errors'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validation failed',
+                    'errors' => $result['errors'],
+                ], 422);
+            }
+
+            $totalCount = $result['processed'] ?? 0;
 
             return response()->json([
                 'status' => 'success',

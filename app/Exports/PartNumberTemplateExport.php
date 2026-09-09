@@ -6,7 +6,7 @@ use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
-class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
+class PartNumberTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
 {
     /**
      * @return array
@@ -15,10 +15,8 @@ class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
     {
         return [
             'pn_baan',
-            'area_code',
-            'machine_code',
-            'qty',
-            'consumed_at',
+            'description',
+            'price_per_unit',
         ];
     }
 
@@ -30,18 +28,15 @@ class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
         return [
             [
                 'PN-001',
-                'FA',
-                'MC-FA-01',
-                5,
-                now()->format('Y-m-d'),
+                'Bearing 6205',
+                45000,
             ],
             [
                 'PN-002',
-                'SMT',
-                'MC-SMT-01',
-                2,
-                now()->format('Y-m-d'),
+                'Solenoid Valve 24V',
+                125000,
             ],
         ];
     }
 }
+

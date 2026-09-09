@@ -137,13 +137,13 @@ class MappingController extends Controller
     /**
      * Import mapping from Excel file (pn_baan, area_code, machine_code).
      */
-    public function importMapping(Request $request): RedirectResponse
+    public function importMapping(Request $request)
     {
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
         ], [
             'file.required' => 'File Excel wajib dipilih.',
-            'file.mimes' => 'File harus berformat .xlsx atau .xls.',
+            'file.mimes' => 'Format file harus .xlsx atau .xls.',
             'file.max' => 'Ukuran file maksimal 10MB.',
         ]);
 
@@ -151,12 +151,37 @@ class MappingController extends Controller
         try {
             Excel::import($importer, $request->file('file'));
         } catch (\Throwable $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Gagal memproses file Excel: ' . $e->getMessage(),
+                    'errors' => [$e->getMessage()],
+                ], 422);
+            }
             return redirect()->back()->with('error', 'Gagal memproses file Excel: ' . $e->getMessage());
+        }
+
+        if ($importer->errorCount > 0 && $importer->successCount === 0) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Import gagal. Terdapat ' . $importer->errorCount . ' baris bermasalah.',
+                    'errors' => $importer->errors,
+                ], 422);
+            }
+            return redirect()->back()->with('error', "Import gagal: {$importer->errorCount} baris tidak valid.")->with('import_errors', $importer->errors);
         }
 
         $message = "Import mapping selesai: {$importer->successCount} data berhasil diproses.";
         if ($importer->errorCount > 0) {
             $message .= " ({$importer->errorCount} baris tidak ditemukan/dilewati)";
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'errors' => $importer->errors,
+                'success_count' => $importer->successCount,
+            ]);
         }
 
         return redirect()->back()->with('success', $message);

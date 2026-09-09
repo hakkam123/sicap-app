@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\MachineTemplateExport;
 use App\Http\Requests\MachineRequest;
+use App\Imports\MachineImport;
 use App\Models\Area;
 use App\Models\Machine;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MachineController extends Controller
 {
@@ -45,18 +50,6 @@ class MachineController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create(): Response
-    {
-        $areas = Area::orderBy('name')->get(['id', 'code', 'name']);
-
-        return Inertia::render('Machine/Form', [
-            'areas' => $areas,
-        ]);
-    }
-
-    /**
      * Store a newly created resource in storage.
      */
     public function store(MachineRequest $request): RedirectResponse
@@ -64,20 +57,6 @@ class MachineController extends Controller
         Machine::create($request->validated());
 
         return redirect()->route('machines.index')->with('success', 'Machine berhasil ditambahkan');
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Machine $machine): Response
-    {
-        $machine->load('area');
-        $areas = Area::orderBy('name')->get(['id', 'code', 'name']);
-
-        return Inertia::render('Machine/Form', [
-            'machine' => $machine,
-            'areas' => $areas,
-        ]);
     }
 
     /**
@@ -105,5 +84,69 @@ class MachineController extends Controller
 
         return redirect()->route('machines.index')->with('success', 'Machine berhasil dihapus');
     }
-}
 
+    /**
+     * Import machines from Excel.
+     */
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ], [
+            'file.required' => 'File Excel wajib dipilih.',
+            'file.mimes' => 'Format file harus .xlsx atau .xls.',
+            'file.max' => 'Ukuran file maksimal 10MB.',
+        ]);
+
+        $importer = new MachineImport();
+
+        try {
+            Excel::import($importer, $request->file('file'));
+        } catch (\Throwable $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Gagal memproses file Excel: ' . $e->getMessage(),
+                    'errors' => [$e->getMessage()],
+                ], 422);
+            }
+            return redirect()->back()->with('error', 'Gagal memproses file Excel: ' . $e->getMessage());
+        }
+
+        if ($importer->errorCount > 0 && $importer->successCount === 0) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Import gagal. Terdapat ' . $importer->errorCount . ' baris bermasalah.',
+                    'errors' => $importer->errors,
+                ], 422);
+            }
+            return redirect()->back()->with('error', "Import gagal: {$importer->errorCount} baris tidak valid.")->with('import_errors', $importer->errors);
+        }
+
+        $msg = "Import Machine selesai: {$importer->successCount} data berhasil diproses.";
+        if ($importer->updatedCount > 0) {
+            $msg .= " ({$importer->updatedCount} data diperbarui)";
+        }
+        if ($importer->errorCount > 0) {
+            $msg .= " - Terdapat {$importer->errorCount} baris dilewati.";
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'errors' => $importer->errors,
+                'success_count' => $importer->successCount,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
+    }
+
+    /**
+     * Download machine Excel template.
+     */
+    public function downloadTemplate(): BinaryFileResponse
+    {
+        return Excel::download(new MachineTemplateExport(), 'template_machine.xlsx');
+    }
+}

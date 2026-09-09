@@ -11,7 +11,7 @@ import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import { Search, RotateCcw, Plus, Upload, RefreshCw } from 'lucide-vue-next';
+import { Search, RotateCcw, Plus, Upload, RefreshCw, Download, AlertCircle, X } from 'lucide-vue-next';
 
 const props = defineProps({
     consumes: {
@@ -282,46 +282,113 @@ const submitManualForm = () => {
 const isImportModalOpen = ref(false);
 const importFile = ref(null);
 const importInputRef = ref(null);
-
-const importForm = useForm({
-    file: null,
-});
+const isUploading = ref(false);
+const importErrors = ref([]);
 
 const openImportModal = () => {
-    importForm.reset();
     importFile.value = null;
+    importErrors.value = [];
+    isUploading.value = false;
+    if (importInputRef.value) importInputRef.value.value = '';
     isImportModalOpen.value = true;
 };
 
 const closeImportModal = () => {
+    if (isUploading.value) return;
     isImportModalOpen.value = false;
+    importFile.value = null;
+    importErrors.value = [];
+    if (importInputRef.value) importInputRef.value.value = '';
 };
 
 const handleImportFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
         importFile.value = file;
-        importForm.file = file;
+        importErrors.value = [];
     }
 };
 
-const submitImportForm = () => {
-    if (!importForm.file) return;
-    importForm.post(route('consume.import.store'), {
-        onSuccess: () => {
-            importForm.reset();
-            importFile.value = null;
-            if (importInputRef.value) importInputRef.value.value = '';
-        },
-    });
+const submitImportForm = async () => {
+    if (!importFile.value || isUploading.value) return;
+
+    isUploading.value = true;
+    importErrors.value = [];
+
+    const formData = new FormData();
+    formData.append('file', importFile.value);
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+    try {
+        const response = await fetch(route('consume.import'), {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+            },
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            if (Array.isArray(result.errors) && result.errors.length) {
+                importErrors.value = result.errors;
+            } else if (result.message) {
+                importErrors.value = [result.message];
+            } else {
+                importErrors.value = ['Gagal memproses file import. Silakan periksa format data.'];
+            }
+            return;
+        }
+
+        closeImportModal();
+        router.reload({ preserveScroll: true });
+    } catch (err) {
+        importErrors.value = [err.message || 'Terjadi kesalahan saat mengunggah file.'];
+    } finally {
+        isUploading.value = false;
+    }
 };
 
 // ==========================================
-// 6. MODAL SYNC API INFO
+// 6. EXPORT EXCEL
+// ==========================================
+const exportExcel = () => {
+    const params = new URLSearchParams();
+    if (filters.value.search) params.append('search', filters.value.search);
+    if (filters.value.area_id) params.append('area_id', filters.value.area_id);
+    if (filters.value.machine_id) params.append('machine_id', filters.value.machine_id);
+    if (filters.value.date_from) params.append('date_from', filters.value.date_from);
+    if (filters.value.date_to) params.append('date_to', filters.value.date_to);
+
+    window.location.href = `${route('consume.export')}?${params.toString()}`;
+};
+
+// ==========================================
+// 7. MODAL SYNC API & MANUAL TRIGGER
 // ==========================================
 const isApiModalOpen = ref(false);
+const isSyncing = ref(false);
 const openApiModal = () => { isApiModalOpen.value = true; };
-const closeApiModal = () => { isApiModalOpen.value = false; };
+const closeApiModal = () => {
+    if (!isSyncing.value) {
+        isApiModalOpen.value = false;
+    }
+};
+
+const triggerManualSync = () => {
+    isSyncing.value = true;
+    router.post(route('consume.sync-api'), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            isSyncing.value = false;
+            isApiModalOpen.value = false;
+        },
+    });
+};
 </script>
 
 <template>
@@ -365,10 +432,20 @@ const closeApiModal = () => { isApiModalOpen.value = false; };
                     v-if="isAdmin"
                     type="button"
                     @click="openImportModal"
-                    class="flex items-center gap-1 px-2.5 py-1.5 border border-green-600 bg-green-600 text-xs font-medium text-white rounded-md hover:bg-green-700 transition"
+                    class="flex items-center gap-1 px-2.5 py-1.5 border border-emerald-600 bg-emerald-600 text-xs font-medium text-white rounded-md hover:bg-emerald-700 transition"
                 >
                     <Upload class="w-3.5 h-3.5 text-white" />
                     Import Excel
+                </button>
+
+                <button
+                    type="button"
+                    @click="exportExcel"
+                    class="flex items-center gap-1 px-2.5 py-1.5 border border-emerald-600 bg-white text-emerald-700 text-xs font-medium rounded-md hover:bg-emerald-50 transition"
+                    title="Export data konsumsi sesuai filter aktif ke file Excel"
+                >
+                    <Download class="w-3.5 h-3.5 text-emerald-600" />
+                    Export Excel
                 </button>
 
 
@@ -750,39 +827,49 @@ const closeApiModal = () => { isApiModalOpen.value = false; };
         </Modal>
 
         <!-- MODAL IMPORT EXCEL -->
-        <Modal :show="isImportModalOpen" @close="closeImportModal">
-            <div class="p-6 sm:p-8 space-y-6">
+        <Modal :show="isImportModalOpen" @close="closeImportModal" max-width="lg">
+            <div class="p-6 sm:p-7 space-y-5">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div>
                         <h3 class="text-base font-bold text-slate-900">
                             Import Data Consume dari Excel
                         </h3>
                         <p class="text-xs text-slate-500 mt-0.5">
-                            File Excel diproses secara asynchronous via background queue.
+                            Unggah file Excel untuk mencatat transaksi pemakaian sparepart secara massal.
                         </p>
                     </div>
-                    <button @click="closeImportModal" class="text-slate-400 hover:text-slate-600 p-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                    <button @click="closeImportModal" :disabled="isUploading" class="text-slate-400 hover:text-slate-600 p-1">
+                        <X class="w-5 h-5" />
                     </button>
                 </div>
 
-                <form @submit.prevent="submitImportForm" class="space-y-4">
-                    <div class="p-3.5 bg-blue-50/70 rounded-xl border border-blue-100 flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-bold text-blue-900">Template Format Excel</p>
-                            <p class="text-[11px] text-blue-700">Kolom: Date | Part Number | Desc | qty | Amount</p>
-                        </div>
-                        <a
-                            :href="route('consume.template')"
-                            class="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 underline"
-                            download
-                        >
-                            Download Template
-                        </a>
+                <div class="p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-emerald-900">Format Kolom Excel:</p>
+                        <p class="text-[11px] text-emerald-700 font-mono mt-0.5">pn_baan | area_code | machine_code | qty | consumed_at</p>
                     </div>
+                    <a
+                        :href="route('consume.template')"
+                        class="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 underline"
+                        download
+                    >
+                        <Download class="w-3.5 h-3.5" />
+                        Download Template
+                    </a>
+                </div>
 
+                <!-- Error Messages Box -->
+                <div v-if="importErrors.length > 0" class="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                    <div class="flex items-center gap-1.5 font-bold text-red-800">
+                        <AlertCircle class="w-4 h-4 flex-shrink-0" />
+                        <span>Terdapat kesalahan pada data import:</span>
+                    </div>
+                    <ul class="list-disc list-inside space-y-0.5 pl-1 text-[11px]">
+                        <li v-for="(err, idx) in importErrors" :key="idx">{{ err }}</li>
+                    </ul>
+                </div>
+
+                <form @submit.prevent="submitImportForm" class="space-y-4">
                     <div>
                         <InputLabel for="import_file" value="Pilih File Excel (.xlsx, .xls) *" />
                         <input
@@ -791,19 +878,23 @@ const closeApiModal = () => { isApiModalOpen.value = false; };
                             type="file"
                             accept=".xlsx, .xls"
                             @change="handleImportFileChange"
-                            class="mt-1 block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            class="mt-1 block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
                             required
                         />
-                        <InputError class="mt-1" :message="importForm.errors.file" />
                     </div>
 
-                    <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                        <SecondaryButton type="button" @click="closeImportModal">
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <SecondaryButton type="button" @click="closeImportModal" :disabled="isUploading">
                             Batal
                         </SecondaryButton>
-                        <PrimaryButton :disabled="importForm.processing || !importForm.file">
-                            {{ importForm.processing ? 'Mengunggah...' : 'Upload & Jalankan Queue' }}
-                        </PrimaryButton>
+                        <button
+                            type="submit"
+                            :disabled="!importFile || isUploading"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Upload class="w-3.5 h-3.5" />
+                            <span>{{ isUploading ? 'Mengimpor...' : 'Import Data' }}</span>
+                        </button>
                     </div>
                 </form>
 
@@ -832,34 +923,91 @@ const closeApiModal = () => { isApiModalOpen.value = false; };
             </div>
         </Modal>
 
-        <!-- MODAL SYNC API INFO -->
+        <!-- MODAL SYNC API INFO & MANUAL TRIGGER -->
         <Modal :show="isApiModalOpen" @close="closeApiModal">
-            <div class="p-6 sm:p-8 space-y-4">
+            <div class="p-6 sm:p-7 space-y-5">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <h3 class="text-base font-bold text-slate-900">
-                        REST API Synchronisation Endpoint
-                    </h3>
-                    <button @click="closeApiModal" class="text-slate-400 hover:text-slate-600 p-1">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">
+                            Sinkronisasi API Konsumsi
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Integrasi otomatis melalui Laravel Scheduler dan eksekusi manual kapan saja.
+                        </p>
+                    </div>
+                    <button @click="closeApiModal" :disabled="isSyncing" class="text-slate-400 hover:text-slate-600 p-1 disabled:opacity-50">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
-                <div class="space-y-3 text-xs text-slate-600">
-                    <p>
-                        Sistem eksternal dapat mengirimkan rekaman consume melalui endpoint:
+                <!-- 1. Trigger Manual Sync -->
+                <div class="rounded-xl border border-blue-100 bg-blue-50/60 p-4 space-y-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h4 class="text-xs font-bold text-blue-900">
+                                Eksekusi Manual (Tarik Data Sekarang)
+                            </h4>
+                            <p class="text-xs text-blue-700/80 mt-1 leading-relaxed">
+                                Menjalankan sinkronisasi data konsumsi dari endpoint API eksternal secara langsung tanpa menunggu jadwal otomatis.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-1 flex items-center gap-2">
+                        <button
+                            type="button"
+                            @click="triggerManualSync"
+                            :disabled="isSyncing"
+                            class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            <RefreshCw :class="['w-3.5 h-3.5', isSyncing ? 'animate-spin' : '']" />
+                            <span>{{ isSyncing ? 'Sedang Menyinkronkan...' : 'Sinkronkan Sekarang' }}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Scheduler Info -->
+                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            Scheduler Aktif
+                        </span>
+                        <h4 class="text-xs font-bold text-slate-800">
+                            Jadwal Otomatis (Laravel Scheduler)
+                        </h4>
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Command <code class="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-800">php artisan sicap:sync-api</code> dijadwalkan berjalan otomatis 3 kali sehari:
                     </p>
-                    <div class="p-3 bg-slate-900 text-slate-100 rounded-lg font-mono text-[11px] overflow-x-auto">
+                    <ul class="text-xs text-slate-600 space-y-1 list-disc list-inside ml-1">
+                        <li>Pukul <strong class="font-semibold text-slate-800">05:00 WIB</strong></li>
+                        <li>Pukul <strong class="font-semibold text-slate-800">11:00 WIB</strong></li>
+                        <li>Pukul <strong class="font-semibold text-slate-800">17:00 WIB</strong></li>
+                    </ul>
+                    <p class="text-[11px] text-slate-400">
+                        Dilengkapi proteksi <code class="font-mono text-[10px]">withoutOverlapping</code> dan pencatatan riwayat di <code class="font-mono text-[10px]">storage/logs/laravel.log</code>.
+                    </p>
+                </div>
+
+                <!-- 3. Inbound REST API Endpoint -->
+                <div class="space-y-2 text-xs text-slate-600">
+                    <h4 class="font-bold text-slate-700">
+                        Inbound Webhook / Push Endpoint
+                    </h4>
+                    <p class="text-[11px] text-slate-500">
+                        Sistem eksternal juga dapat mengirimkan rekaman consume secara langsung:
+                    </p>
+                    <div class="p-2.5 bg-slate-900 text-slate-100 rounded-lg font-mono text-[11px] overflow-x-auto">
                         POST /api/v1/consumes/sync
                     </div>
-                    <p class="text-[11px] text-slate-500">
-                        Header wajib: <code>Authorization: Bearer &lt;token&gt;</code>, <code>Accept: application/json</code>.
+                    <p class="text-[11px] text-slate-400">
+                        Header: <code>Authorization: Bearer &lt;token&gt;</code>, <code>Accept: application/json</code>.
                     </p>
                 </div>
 
                 <div class="flex justify-end pt-3 border-t border-slate-100">
-                    <SecondaryButton @click="closeApiModal">
+                    <SecondaryButton @click="closeApiModal" :disabled="isSyncing">
                         Tutup
                     </SecondaryButton>
                 </div>

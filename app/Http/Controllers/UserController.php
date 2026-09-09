@@ -39,14 +39,6 @@ class UserController extends Controller
     }
 
     /**
-     * Show the form for creating a new user.
-     */
-    public function create(): Response
-    {
-        return Inertia::render('User/Form');
-    }
-
-    /**
      * Store a newly created user in storage.
      */
     public function store(UserRequest $request): RedirectResponse
@@ -61,16 +53,6 @@ class UserController extends Controller
         $user->assignRole($request->role);
 
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan');
-    }
-
-    /**
-     * Show the form for editing the specified user.
-     */
-    public function edit(User $user): Response
-    {
-        return Inertia::render('User/Form', [
-            'user' => $user->load('roles:id,name'),
-        ]);
     }
 
     /**

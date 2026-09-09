@@ -23,10 +23,8 @@ class DashboardController extends Controller
         $areaId = $request->input('area_id');
         $machineId = $request->input('machine_id');
         
-        // Determine default date range
-        $defaultDateFrom = Consume::exists()
-            ? Carbon::parse(Consume::min('consumed_at'))->toDateString()
-            : now()->subDays(30)->toDateString();
+        // Determine default date range (default 30 hari terakhir)
+        $defaultDateFrom = now()->subDays(30)->toDateString();
         $defaultDateTo = now()->toDateString();
 
         $dateFrom = $request->input('date_from', $defaultDateFrom);
@@ -64,17 +62,19 @@ class DashboardController extends Controller
                 ];
             });
 
-        // 3. Top Consumes by Part Number (Ordered by highest consumed Qty first)
+        // 3. Top Consumes by Part Number (Ordered by highest total amount first)
         $topConsumes = (clone $query)
             ->select('part_number_id')
-            ->selectRaw('SUM(ABS(quantity)) as total_qty, SUM(ABS(amount)) as total_amount, COUNT(*) as [count]')
+            ->selectRaw('SUM(ABS(amount)) as total_amount, SUM(ABS(quantity)) as total_qty, COUNT(*) as [count]')
             ->with('partNumber:id,pn_baan,description')
             ->groupBy('part_number_id')
-            ->orderByRaw('SUM(ABS(quantity)) DESC')
+            ->orderByRaw('SUM(ABS(amount)) DESC, SUM(ABS(quantity)) DESC')
             ->limit(10)
             ->get()
-            ->map(function ($item) {
+            ->values()
+            ->map(function ($item, $index) {
                 return [
+                    'rank' => $index + 1,
                     'part_number_id' => $item->part_number_id,
                     'pn_baan' => $item->partNumber?->pn_baan ?? '-',
                     'description' => $item->partNumber?->description ?? '-',
@@ -84,7 +84,55 @@ class DashboardController extends Controller
                 ];
             });
 
-        // 4. Consumption by Area within filter period (Always include ALL active areas)
+        // 4. Area Breakdown (FA, SMT, Common) based on Part Number mapping
+        // Query consumptions within date range (independent of area/machine filter)
+        $consumptionsForArea = Consume::select('part_number_id')
+            ->selectRaw('SUM(ABS(COALESCE(amount, 0))) as total_amount')
+            ->when($dateFrom, fn($q) => $q->whereDate('consumed_at', '>=', $dateFrom))
+            ->when($dateTo, fn($q) => $q->whereDate('consumed_at', '<=', $dateTo))
+            ->groupBy('part_number_id')
+            ->get();
+
+        $partIds = $consumptionsForArea->pluck('part_number_id')->unique()->all();
+
+        // Map area codes for each part number from area_part_number pivot
+        $partAreas = !empty($partIds)
+            ? DB::table('area_part_number')
+                ->join('areas', 'areas.id', '=', 'area_part_number.area_id')
+                ->whereIn('area_part_number.part_number_id', $partIds)
+                ->whereNull('areas.deleted_at')
+                ->select('area_part_number.part_number_id', 'areas.code')
+                ->get()
+                ->groupBy('part_number_id')
+                ->map(fn($rows) => $rows->pluck('code')->map(fn($c) => strtoupper(trim($c)))->unique()->values()->all())
+            : collect();
+
+        $faAmount = 0.0;
+        $smtAmount = 0.0;
+        $commonAmount = 0.0;
+
+        foreach ($consumptionsForArea as $c) {
+            $codes = $partAreas->get($c->part_number_id, []);
+            $hasFa = in_array('FA', $codes);
+            $hasSmt = in_array('SMT', $codes);
+            $amount = (float) abs($c->total_amount);
+
+            if ($hasFa && $hasSmt) {
+                $commonAmount += $amount;
+            } elseif ($hasFa) {
+                $faAmount += $amount;
+            } elseif ($hasSmt) {
+                $smtAmount += $amount;
+            }
+        }
+
+        $areaConsumption = [
+            'fa' => round($faAmount, 2),
+            'smt' => round($smtAmount, 2),
+            'common' => round($commonAmount, 2),
+        ];
+
+        // 5. Consumption by Area within filter period (Always include ALL active areas)
         $byArea = DB::table('areas')
             ->leftJoin('consumes', function ($join) use ($machineId, $dateFrom, $dateTo) {
                 $join->on('consumes.area_id', '=', 'areas.id')
@@ -121,24 +169,35 @@ class DashboardController extends Controller
             ->when($machineId, fn($q) => $q->where('machine_id', $machineId))
             ->when($dateFrom, fn($q) => $q->whereDate('consumed_at', '>=', $dateFrom))
             ->when($dateTo, fn($q) => $q->whereDate('consumed_at', '<=', $dateTo))
-            ->selectRaw('SUM(ABS(quantity)) as total_qty, SUM(ABS(amount)) as total_amount, COUNT(*) as total_count')
-            ->first();
+            ->sum(DB::raw('ABS(quantity)'));
 
-        // Append ke collection byArea jika ada data unassigned
-        if ($unassignedQty && $unassignedQty->total_count > 0) {
+        if ($unassignedQty > 0) {
+            $unassignedAmount = Consume::whereNull('area_id')
+                ->when($machineId, fn($q) => $q->where('machine_id', $machineId))
+                ->when($dateFrom, fn($q) => $q->whereDate('consumed_at', '>=', $dateFrom))
+                ->when($dateTo, fn($q) => $q->whereDate('consumed_at', '<=', $dateTo))
+                ->sum(DB::raw('ABS(amount)'));
+
+            $unassignedCount = Consume::whereNull('area_id')
+                ->when($machineId, fn($q) => $q->where('machine_id', $machineId))
+                ->when($dateFrom, fn($q) => $q->whereDate('consumed_at', '>=', $dateFrom))
+                ->when($dateTo, fn($q) => $q->whereDate('consumed_at', '<=', $dateTo))
+                ->count();
+
             $byArea->push([
-                'area_id'      => null,
-                'area_name'    => 'Tidak Diketahui',
-                'area_code'    => '—',
-                'total_qty'    => (int) abs($unassignedQty->total_qty ?? 0),
-                'total_amount' => (float) abs($unassignedQty->total_amount ?? 0),
-                'total_count'  => (int) ($unassignedQty->total_count ?? 0),
+                'area_id' => null,
+                'area_name' => 'Consume Tanpa Area (Unassigned)',
+                'area_code' => 'UNASSIGNED',
+                'total_qty' => (int) abs($unassignedQty),
+                'total_amount' => (float) abs($unassignedAmount),
+                'total_count' => (int) $unassignedCount,
             ]);
+
             // Re-sort by total_qty desc
             $byArea = $byArea->sortByDesc('total_qty')->values();
         }
 
-        // 5. Filter dropdowns data
+        // 6. Filter dropdowns data
         $areas = Area::select('id', 'code', 'name')->orderBy('name')->get();
         $machines = $areaId
             ? Machine::where('area_id', $areaId)->select('id', 'code', 'name')->orderBy('name')->get()
@@ -147,7 +206,10 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard', [
             'summary' => $summary,
             'chartData' => $chartData,
+            'trendData' => $chartData,
+            'topParts' => $topConsumes,
             'topConsumes' => $topConsumes,
+            'areaConsumption' => $areaConsumption,
             'byArea' => $byArea,
             'areas' => $areas,
             'machines' => $machines,
@@ -170,6 +232,8 @@ class DashboardController extends Controller
             'id'        => 'required|string',
             'date_from' => 'nullable|date',
             'date_to'   => 'nullable|date',
+            'page'      => 'nullable|integer|min:1',
+            'per_page'  => 'nullable|integer|min:5|max:100',
         ]);
 
         $query = Consume::with(['partNumber', 'area', 'machine', 'creator'])
@@ -188,7 +252,15 @@ class DashboardController extends Controller
             $title = $pn ? "{$pn->pn_baan} — {$pn->description}" : 'Part Number';
         }
 
-        $rows = $query->orderByDesc('consumed_at')->limit(50)->get()->map(fn($c) => [
+        // Summary totals across ALL matched records for this drill-down
+        $rawTotals = (clone $query)
+            ->selectRaw('SUM(ABS(quantity)) as total_qty, SUM(ABS(amount)) as total_amount, COUNT(*) as total_count')
+            ->first();
+
+        $perPage = (int) $request->input('per_page', 15);
+        $paginated = $query->orderByDesc('consumed_at')->paginate($perPage);
+
+        $rows = collect($paginated->items())->map(fn($c) => [
             'date'        => $c->consumed_at?->format('d M Y'),
             'pn_baan'     => $c->partNumber?->pn_baan,
             'description' => $c->partNumber?->description,
@@ -203,8 +275,16 @@ class DashboardController extends Controller
         return response()->json([
             'title'        => $title,
             'rows'         => $rows,
-            'total_qty'    => $rows->sum('qty'),
-            'total_amount' => $rows->sum('amount'),
+            'total_qty'    => (int) abs($rawTotals->total_qty ?? 0),
+            'total_amount' => (float) abs($rawTotals->total_amount ?? 0),
+            'pagination'   => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+                'from'         => $paginated->firstItem(),
+                'to'           => $paginated->lastItem(),
+            ],
         ]);
     }
 }
