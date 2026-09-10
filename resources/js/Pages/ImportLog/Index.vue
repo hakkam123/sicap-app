@@ -517,36 +517,7 @@ const handleDownloadErrorExcel = (log) => {
                                     <h3 class="text-sm font-bold text-slate-900 truncate" :title="selectedLog.filename">
                                         {{ selectedLog.filename }}
                                     </h3>
-                                    <span
-                                        class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border"
-                                        :class="getFeatureBadgeClass(selectedLog.feature)"
-                                    >
-                                        {{ selectedLog.feature_label || selectedLog.feature }}
-                                    </span>
-                                    <span
-                                        v-if="selectedLog.status === 'success'"
-                                        class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800"
-                                    >
-                                        Success
-                                    </span>
-                                    <span
-                                        v-else-if="selectedLog.status === 'processing'"
-                                        class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 animate-pulse"
-                                    >
-                                        Processing
-                                    </span>
-                                    <span
-                                        v-else-if="selectedLog.status === 'pending'"
-                                        class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700"
-                                    >
-                                        Pending
-                                    </span>
-                                    <span
-                                        v-else
-                                        class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800"
-                                    >
-                                        Failed
-                                    </span>
+                                   
                                 </div>
                                 <p class="text-[11px] text-slate-400 mt-0.5 font-mono">
                                     Log ID: {{ selectedLog.id }}

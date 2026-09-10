@@ -811,21 +811,29 @@ const saveSchedules = () => {
                             class="mt-1 block w-full text-xs font-mono"
                             placeholder="Cari nomor part (PN BAAN)..."
                             @focus="isPartDropdownOpen = true"
+                            @input="isPartDropdownOpen = true"
                             autocomplete="off"
                             required
                         />
                         <InputError class="mt-1" :message="manualForm.errors.part_number_id" />
 
+                        <!-- Invisible backdrop to close dropdown on click outside -->
+                        <div
+                            v-if="isPartDropdownOpen"
+                            class="fixed inset-0 z-20"
+                            @click="isPartDropdownOpen = false"
+                        ></div>
+
                         <!-- Searchable Dropdown List -->
                         <div
                             v-if="isPartDropdownOpen && filteredPartNumbers.length > 0"
-                            class="absolute left-0 right-0 z-30 mt-1 max-h-52 overflow-y-auto bg-white border border-slate-300 rounded-lg shadow-xl text-xs"
+                            class="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto bg-white border border-slate-300 rounded-lg shadow-2xl text-xs divide-y divide-slate-100"
                         >
                             <div
                                 v-for="part in filteredPartNumbers"
                                 :key="part.id"
                                 @click="selectPart(part)"
-                                class="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0"
+                                class="px-3 py-2.5 hover:bg-blue-50 cursor-pointer transition-colors"
                             >
                                 <div class="font-bold font-mono text-blue-700">{{ part.pn_baan }}</div>
                                 <div class="text-[11px] text-slate-500 truncate">{{ part.description || 'Tanpa Deskripsi' }}</div>
