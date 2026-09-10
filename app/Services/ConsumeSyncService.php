@@ -6,6 +6,7 @@ use App\Models\Area;
 use App\Models\Consume;
 use App\Models\Machine;
 use App\Models\PartNumber;
+use App\Support\IndonesianFormatParser;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -154,16 +155,18 @@ class ConsumeSyncService
         foreach ($items as $index => $item) {
             $rowNum = $index + 1;
             $pnCode = trim((string) ($item['part_number'] ?? $item['pn_baan'] ?? ''));
+            $rawDate = $item['date'] ?? $item['consumed_at'] ?? null;
+            $rawQty = $item['qty'] ?? $item['quantity'] ?? null;
+            $rawAmount = $item['amount'] ?? null;
+
             $areaCode = isset($item['area_code']) && trim((string)$item['area_code']) !== ''
                 ? trim((string)$item['area_code'])
                 : null;
             $machineCode = isset($item['machine_code']) && trim((string)$item['machine_code']) !== ''
                 ? trim((string)$item['machine_code'])
                 : null;
-            $quantity = (int) ($item['quantity'] ?? $item['qty'] ?? 0);
-            $consumedAt = $item['consumed_at'] ?? $item['date'] ?? $now->toDateTimeString();
 
-            // Validate Part Number
+            // 1. Validate Part Number
             $part = $partMap->get($pnCode);
             if (!$part) {
                 $businessErrors[] = [
@@ -173,7 +176,55 @@ class ConsumeSyncService
                 ];
             }
 
-            // Validate Area (if provided)
+            // 2. Validate & Parse Date
+            $consumedAt = IndonesianFormatParser::parseDate($rawDate);
+            if (!$consumedAt) {
+                $businessErrors[] = [
+                    'row' => $rowNum,
+                    'field' => 'date',
+                    'message' => "Format tanggal '{$rawDate}' tidak valid.",
+                ];
+            }
+
+            // 3. Validate & Parse Quantity
+            if ($rawQty === null || trim((string) $rawQty) === '') {
+                $businessErrors[] = [
+                    'row' => $rowNum,
+                    'field' => 'qty',
+                    'message' => "Kolom 'qty' wajib diisi.",
+                ];
+                $quantity = 0;
+            } else {
+                $quantity = IndonesianFormatParser::parseQty($rawQty);
+                if ($quantity === 0) {
+                    $businessErrors[] = [
+                        'row' => $rowNum,
+                        'field' => 'qty',
+                        'message' => "Kolom 'qty' tidak boleh bernilai 0.",
+                    ];
+                }
+            }
+
+            // 4. Validate & Parse Amount (Format Indonesia: titik ribuan, koma desimal, boleh negatif)
+            if ($rawAmount === null || trim((string) $rawAmount) === '') {
+                $businessErrors[] = [
+                    'row' => $rowNum,
+                    'field' => 'amount',
+                    'message' => "Kolom 'amount' wajib diisi.",
+                ];
+                $amount = null;
+            } else {
+                $amount = IndonesianFormatParser::parseAmount($rawAmount);
+                if ($amount === null) {
+                    $businessErrors[] = [
+                        'row' => $rowNum,
+                        'field' => 'amount',
+                        'message' => "Format nominal amount '{$rawAmount}' tidak valid.",
+                    ];
+                }
+            }
+
+            // 5. Validate Area (opsional jika disediakan)
             $area = null;
             if ($areaCode !== null) {
                 $area = $areaMap->get($areaCode);
@@ -186,7 +237,7 @@ class ConsumeSyncService
                 }
             }
 
-            // Validate Machine (if provided)
+            // 6. Validate Machine (opsional jika disediakan)
             $machine = null;
             if ($machineCode !== null) {
                 $machine = $machineMap->get($machineCode);
@@ -199,7 +250,7 @@ class ConsumeSyncService
                 }
             }
 
-            // Validate Machine and Area relationship
+            // 7. Validate Machine and Area relationship
             if ($machine && $area && $machine->area_id !== $area->id) {
                 $businessErrors[] = [
                     'row' => $rowNum,
@@ -210,15 +261,6 @@ class ConsumeSyncService
 
             if (!empty($businessErrors)) {
                 continue;
-            }
-
-            // Calculate amount if omitted
-            $amount = isset($item['amount']) && $item['amount'] !== null && $item['amount'] !== ''
-                ? (float) $item['amount']
-                : null;
-
-            if ($amount === null && $part && $part->price_per_unit !== null) {
-                $amount = (float) $part->price_per_unit * abs($quantity);
             }
 
             $recordsToInsert[] = [
@@ -258,4 +300,3 @@ class ConsumeSyncService
         ];
     }
 }
-

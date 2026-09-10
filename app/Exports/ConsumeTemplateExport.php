@@ -14,11 +14,11 @@ class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
     public function headings(): array
     {
         return [
-            'pn_baan',
-            'area_code',
-            'machine_code',
+            'Date',
+            'Part Number',
+            'Desc',
             'qty',
-            'consumed_at',
+            'Amount',
         ];
     }
 
@@ -29,18 +29,18 @@ class ConsumeTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
     {
         return [
             [
-                'PN-001',
-                'FA',
-                'MC-FA-01',
-                5,
-                now()->format('Y-m-d'),
+                '6 Juli 2026',
+                'SPSMMEFILTER-3747',
+                'Filter NXT H02 (AA8BD00)',
+                -4,
+                '-1.386.000',
             ],
             [
-                'PN-002',
-                'SMT',
-                'MC-SMT-01',
-                2,
-                now()->format('Y-m-d'),
+                '7 Juli 2026',
+                'SPSMMEFILTER-3748',
+                'Filter NXT H03 (AA8BD01)',
+                10,
+                '2.500.000',
             ],
         ];
     }

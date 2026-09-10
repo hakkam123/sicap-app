@@ -251,15 +251,9 @@ const selectedPart = computed(() => {
     return props.partNumbers.find(p => p.id === manualForm.part_number_id);
 });
 
-const estimatedAmount = computed(() => {
-    if (!selectedPart.value || selectedPart.value.price_per_unit === null) return null;
-    const qty = parseInt(manualForm.quantity) || 0;
-    return Math.max(0, qty) * Number(selectedPart.value.price_per_unit);
-});
-
 const selectPart = (part) => {
     manualForm.part_number_id = part.id;
-    manualSearchQuery.value = `${part.pn_baan} - ${part.description || ''}`;
+    manualSearchQuery.value = part.pn_baan;
     isPartDropdownOpen.value = false;
 };
 
@@ -847,6 +841,19 @@ const saveSchedules = () => {
                 </div>
 
                 <form @submit.prevent="submitManualForm" class="space-y-4">
+                    <!-- Date (Tanggal Pemakaian) -->
+                    <div>
+                        <InputLabel for="manual_consumed_at" value="Date (Tanggal Pemakaian) *" />
+                        <TextInput
+                            id="manual_consumed_at"
+                            v-model="manualForm.consumed_at"
+                            type="date"
+                            class="mt-1 block w-full text-xs"
+                            required
+                        />
+                        <InputError class="mt-1" :message="manualForm.errors.consumed_at" />
+                    </div>
+
                     <!-- Part Number Autocomplete / Search -->
                     <div class="relative">
                         <InputLabel for="manual_part_number" value="Part Number (PN BAAN) *" />
@@ -855,7 +862,7 @@ const saveSchedules = () => {
                             v-model="manualSearchQuery"
                             type="text"
                             class="mt-1 block w-full text-xs font-mono"
-                            placeholder="Cari nomor part atau ketik nama..."
+                            placeholder="Cari nomor part (PN BAAN)..."
                             @focus="isPartDropdownOpen = true"
                             autocomplete="off"
                             required
@@ -875,91 +882,90 @@ const saveSchedules = () => {
                             >
                                 <div class="font-bold font-mono text-blue-700">{{ part.pn_baan }}</div>
                                 <div class="text-[11px] text-slate-500 truncate">{{ part.description || 'Tanpa Deskripsi' }}</div>
-                                <div v-if="part.price_per_unit" class="text-[10px] text-emerald-600 font-semibold">
-                                    Harga: {{ formatRupiah(part.price_per_unit) }}
-                                </div>
                             </div>
+                        </div>
+
+                        <!-- Read-only Desc Display -->
+                        <div v-if="selectedPart" class="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Deskripsi Part (Desc):</span>
+                            <span class="text-xs text-slate-800 font-medium">{{ selectedPart.description || '-' }}</span>
                         </div>
                     </div>
 
-                    <!-- Area Dropdown -->
-                    <div>
-                        <InputLabel for="manual_area" value="Area (Opsional)" />
-                        <select
-                            id="manual_area"
-                            v-model="manualForm.area_id"
-                            @change="handleManualAreaChange"
-                            class="mt-1 block w-full border-slate-300 rounded-lg text-xs focus:border-blue-500 focus:ring-blue-500"
-                        >
-                            <option value="">-- Tanpa Area --</option>
-                            <option v-for="a in areas" :key="a.id" :value="a.id">
-                                {{ a.name }} ({{ a.code }})
-                            </option>
-                        </select>
-                        <InputError class="mt-1" :message="manualForm.errors.area_id" />
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Quantity -->
+                        <div>
+                            <InputLabel for="manual_qty" value="Quantity (qty) *" />
+                            <TextInput
+                                id="manual_qty"
+                                v-model="manualForm.quantity"
+                                type="number"
+                                step="1"
+                                class="mt-1 block w-full text-xs"
+                                placeholder="Contoh: -4 atau 10"
+                                required
+                            />
+                            <p class="text-[10px] text-slate-400 mt-1">
+                                * Boleh bernilai negatif.
+                            </p>
+                            <InputError class="mt-1" :message="manualForm.errors.quantity" />
+                        </div>
+
+                        <!-- Amount -->
+                        <div>
+                            <InputLabel for="manual_amount" value="Amount (Nominal Rp) *" />
+                            <TextInput
+                                id="manual_amount"
+                                v-model="manualForm.amount"
+                                type="number"
+                                step="0.01"
+                                class="mt-1 block w-full text-xs"
+                                placeholder="Contoh: -1386000"
+                                required
+                            />
+                            <p class="text-[10px] text-slate-400 mt-1">
+                                * Boleh bernilai negatif.
+                            </p>
+                            <InputError class="mt-1" :message="manualForm.errors.amount" />
+                        </div>
                     </div>
 
-                    <!-- Machine Dropdown -->
-                    <div>
-                        <InputLabel for="manual_machine" value="Machine / Station (Opsional)" />
-                        <select
-                            id="manual_machine"
-                            v-model="manualForm.machine_id"
-                            :disabled="!manualForm.area_id || manualMachines.length === 0"
-                            class="mt-1 block w-full border-slate-300 rounded-lg text-xs focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                            <option value="">{{ manualForm.area_id ? '-- Tanpa Machine --' : 'Pilih area terlebih dahulu' }}</option>
-                            <option v-for="m in manualMachines" :key="m.id" :value="m.id">
-                                {{ m.name }} ({{ m.code }})
-                            </option>
-                        </select>
-                        <InputError class="mt-1" :message="manualForm.errors.machine_id" />
-                    </div>
+                    <!-- Area Dropdown (Opsional) -->
+                    <div class="pt-2 border-t border-slate-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <InputLabel for="manual_area" value="Area (Opsional)" />
+                                <select
+                                    id="manual_area"
+                                    v-model="manualForm.area_id"
+                                    @change="handleManualAreaChange"
+                                    class="mt-1 block w-full border-slate-300 rounded-lg text-xs focus:border-blue-500 focus:ring-blue-500"
+                                >
+                                    <option value="">-- Tanpa Area --</option>
+                                    <option v-for="a in areas" :key="a.id" :value="a.id">
+                                        {{ a.name }} ({{ a.code }})
+                                    </option>
+                                </select>
+                                <InputError class="mt-1" :message="manualForm.errors.area_id" />
+                            </div>
 
-                    <!-- Quantity (Wajib Positif) -->
-                    <div>
-                        <InputLabel for="manual_qty" value="Quantity (Jumlah Unit) *" />
-                        <TextInput
-                            id="manual_qty"
-                            v-model="manualForm.quantity"
-                            type="number"
-                            min="1"
-                            step="1"
-                            class="mt-1 block w-full text-xs"
-                            placeholder="Contoh: 5"
-                            required
-                        />
-                        <p class="text-[11px] text-slate-400 mt-1">
-                            * Input kuantitas selalu berupa angka positif (pengeluaran stok).
-                        </p>
-                        <InputError class="mt-1" :message="manualForm.errors.quantity" />
-                    </div>
-
-                    <!-- Amount -->
-                    <div>
-                        <InputLabel for="manual_amount" value="Amount / Total Nominal (Rp)" />
-                        <TextInput
-                            id="manual_amount"
-                            v-model="manualForm.amount"
-                            type="number"
-                            step="0.01"
-                            class="mt-1 block w-full text-xs"
-                            :placeholder="estimatedAmount !== null ? `Estimasi: ${formatRupiah(estimatedAmount)}` : 'Dihitung otomatis jika kosong'"
-                        />
-                        <InputError class="mt-1" :message="manualForm.errors.amount" />
-                    </div>
-
-                    <!-- Consumed At -->
-                    <div>
-                        <InputLabel for="manual_consumed_at" value="Tanggal Pemakaian *" />
-                        <TextInput
-                            id="manual_consumed_at"
-                            v-model="manualForm.consumed_at"
-                            type="date"
-                            class="mt-1 block w-full text-xs"
-                            required
-                        />
-                        <InputError class="mt-1" :message="manualForm.errors.consumed_at" />
+                            <!-- Machine Dropdown (Opsional) -->
+                            <div>
+                                <InputLabel for="manual_machine" value="Machine / Station (Opsional)" />
+                                <select
+                                    id="manual_machine"
+                                    v-model="manualForm.machine_id"
+                                    :disabled="!manualForm.area_id || manualMachines.length === 0"
+                                    class="mt-1 block w-full border-slate-300 rounded-lg text-xs focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                    <option value="">{{ manualForm.area_id ? '-- Tanpa Machine --' : 'Pilih area terlebih dahulu' }}</option>
+                                    <option v-for="m in manualMachines" :key="m.id" :value="m.id">
+                                        {{ m.name }} ({{ m.code }})
+                                    </option>
+                                </select>
+                                <InputError class="mt-1" :message="manualForm.errors.machine_id" />
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Actions -->
@@ -995,7 +1001,7 @@ const saveSchedules = () => {
                 <div class="p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between">
                     <div>
                         <p class="text-xs font-bold text-emerald-900">Format Kolom Excel:</p>
-                        <p class="text-[11px] text-emerald-700 font-mono mt-0.5">pn_baan | area_code | machine_code | qty | consumed_at</p>
+                        <p class="text-[11px] text-emerald-700 font-mono mt-0.5">Date | Part Number | Desc | qty | Amount</p>
                     </div>
                     <a
                         :href="route('consume.template')"
@@ -1041,8 +1047,7 @@ const saveSchedules = () => {
                             :disabled="!importFile || isUploading"
                             class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
-                            <Upload class="w-3.5 h-3.5" />
-                            <span>{{ isUploading ? 'Mengimpor...' : 'Import Data' }}</span>
+                            <span>{{ isUploading ? 'Mengimpor...' : 'Import' }}</span>
                         </button>
                     </div>
                 </form>

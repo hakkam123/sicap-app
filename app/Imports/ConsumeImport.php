@@ -2,18 +2,14 @@
 
 namespace App\Imports;
 
-use App\Models\Area;
 use App\Models\Consume;
-use App\Models\Machine;
 use App\Models\PartNumber;
-use Carbon\Carbon;
-use DateTimeInterface;
+use App\Support\IndonesianFormatParser;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ConsumeImport implements ToArray, WithHeadingRow
 {
@@ -32,100 +28,79 @@ class ConsumeImport implements ToArray, WithHeadingRow
             foreach ($array as $index => $row) {
                 $rowNumber = $index + 2;
 
-                $pnBaan = isset($row['pn_baan']) ? trim((string) $row['pn_baan']) : '';
-                $areaCode = isset($row['area_code']) ? trim((string) $row['area_code']) : '';
-                $machineCode = isset($row['machine_code']) ? trim((string) $row['machine_code']) : '';
-                $qtyRaw = isset($row['qty']) ? trim((string) $row['qty']) : (isset($row['quantity']) ? trim((string) $row['quantity']) : '');
-                $consumedAtRaw = isset($row['consumed_at']) ? $row['consumed_at'] : null;
+                // Normalisasi kunci header (lowercase, buang spasi dan underscore)
+                $normalizedRow = [];
+                foreach ($row as $k => $v) {
+                    $cleanedKey = strtolower(str_replace([' ', '_', '-'], '', (string) $k));
+                    $normalizedRow[$cleanedKey] = $v;
+                }
 
-                // Skip completely empty row
-                if ($pnBaan === '' && $areaCode === '' && $machineCode === '' && $qtyRaw === '' && empty($consumedAtRaw)) {
+                $rawDate = $normalizedRow['date'] ?? $normalizedRow['consumedat'] ?? $row['Date'] ?? $row['date'] ?? null;
+                $rawPn = $normalizedRow['partnumber'] ?? $normalizedRow['pnbaan'] ?? $row['Part Number'] ?? $row['part_number'] ?? $row['pn_baan'] ?? null;
+                $rawQty = $normalizedRow['qty'] ?? $normalizedRow['quantity'] ?? $row['qty'] ?? $row['quantity'] ?? null;
+                $rawAmount = $normalizedRow['amount'] ?? $row['Amount'] ?? $row['amount'] ?? null;
+
+                $pnBaan = trim((string) $rawPn);
+
+                // Skip jika baris benar-benar kosong
+                if ($pnBaan === '' && empty($rawDate) && ($rawQty === null || $rawQty === '') && ($rawAmount === null || $rawAmount === '')) {
                     continue;
                 }
 
+                // 1. Validasi Part Number
                 if ($pnBaan === '') {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'pn_baan' wajib diisi.";
+                    $this->errors[] = "Baris {$rowNumber}: Kolom 'Part Number' wajib diisi.";
                     continue;
                 }
 
                 $partNumber = PartNumber::where('pn_baan', $pnBaan)->first();
                 if (!$partNumber) {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Part Number '{$pnBaan}' tidak ditemukan.";
+                    $this->errors[] = "Baris {$rowNumber}: Part Number '{$pnBaan}' tidak ditemukan di master data.";
                     continue;
                 }
 
-                if ($qtyRaw === '' || !is_numeric($qtyRaw) || (int) $qtyRaw <= 0) {
+                // 2. Validasi & Parsing Tanggal (Format fleksibel termasuk bahasa Indonesia)
+                $consumedAt = IndonesianFormatParser::parseDate($rawDate);
+                if (!$consumedAt) {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'qty' harus berupa angka bulat positif lebih dari 0.";
+                    $this->errors[] = "Baris {$rowNumber}: Format tanggal '{$rawDate}' tidak valid.";
                     continue;
                 }
-                $qty = (int) $qtyRaw;
 
-                // Parse consumed_at
-                $consumedAt = null;
-                if (!empty($consumedAtRaw)) {
-                    try {
-                        if (is_numeric($consumedAtRaw)) {
-                            $consumedAt = Carbon::instance(ExcelDate::excelToDateTimeObject($consumedAtRaw));
-                        } elseif ($consumedAtRaw instanceof DateTimeInterface) {
-                            $consumedAt = Carbon::instance($consumedAtRaw);
-                        } else {
-                            $consumedAt = Carbon::parse($consumedAtRaw);
-                        }
-                    } catch (\Throwable $e) {
-                        $this->errorCount++;
-                        $this->errors[] = "Baris {$rowNumber}: Format tanggal '{$consumedAtRaw}' tidak valid.";
-                        continue;
-                    }
-                } else {
-                    $consumedAt = now();
+                // 3. Validasi & Parsing Quantity (Integer, boleh bernilai negatif untuk pengeluaran)
+                if ($rawQty === null || trim((string) $rawQty) === '') {
+                    $this->errorCount++;
+                    $this->errors[] = "Baris {$rowNumber}: Kolom 'qty' wajib diisi.";
+                    continue;
+                }
+                $qty = IndonesianFormatParser::parseQty($rawQty);
+                if ($qty === 0) {
+                    $this->errorCount++;
+                    $this->errors[] = "Baris {$rowNumber}: Kolom 'qty' tidak boleh bernilai 0.";
+                    continue;
                 }
 
-                // Area lookup
-                $areaId = null;
-                if ($areaCode !== '') {
-                    $area = Area::where('code', $areaCode)->first();
-                    if (!$area) {
-                        $this->errorCount++;
-                        $this->errors[] = "Baris {$rowNumber}: Area dengan kode '{$areaCode}' tidak ditemukan.";
-                        continue;
-                    }
-                    $areaId = $area->id;
+                // 4. Validasi & Parsing Amount (Format Indonesia: titik ribuan, koma desimal, boleh negatif)
+                if ($rawAmount === null || trim((string) $rawAmount) === '') {
+                    $this->errorCount++;
+                    $this->errors[] = "Baris {$rowNumber}: Kolom 'Amount' wajib diisi.";
+                    continue;
+                }
+                $amount = IndonesianFormatParser::parseAmount($rawAmount);
+                if ($amount === null) {
+                    $this->errorCount++;
+                    $this->errors[] = "Baris {$rowNumber}: Format nominal Amount '{$rawAmount}' tidak valid.";
+                    continue;
                 }
 
-                // Machine lookup
-                $machineId = null;
-                if ($machineCode !== '') {
-                    $machineQuery = Machine::where('code', $machineCode);
-                    if ($areaId) {
-                        $machine = (clone $machineQuery)->where('area_id', $areaId)->first() ?: $machineQuery->first();
-                    } else {
-                        $machine = $machineQuery->first();
-                    }
-
-                    if (!$machine) {
-                        $this->errorCount++;
-                        $this->errors[] = "Baris {$rowNumber}: Machine dengan kode '{$machineCode}' tidak ditemukan.";
-                        continue;
-                    }
-                    $machineId = $machine->id;
-                    if (!$areaId && $machine->area_id) {
-                        $areaId = $machine->area_id;
-                    }
-                }
-
-                $amount = null;
-                if ($partNumber->price_per_unit !== null) {
-                    $amount = round($qty * (float) $partNumber->price_per_unit, 2);
-                }
-
+                // Simpan transaksi consume (area_id & machine_id bernilai null sesuai format baru)
                 Consume::create([
                     'id' => (string) Str::ulid(),
                     'part_number_id' => $partNumber->id,
-                    'area_id' => $areaId,
-                    'machine_id' => $machineId,
+                    'area_id' => null,
+                    'machine_id' => null,
                     'quantity' => $qty,
                     'amount' => $amount,
                     'consumed_at' => $consumedAt,

@@ -4,7 +4,7 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import { X as XMarkIcon } from 'lucide-vue-next';
+import { X as XMarkIcon, RefreshCw, Clock } from 'lucide-vue-next';
 
 // Chart.js & vue-chartjs integration
 import {
@@ -69,6 +69,10 @@ const props = defineProps({
     machines: {
         type: Array,
         default: () => [],
+    },
+    lastSyncAt: {
+        type: String,
+        default: null,
     },
     filters: {
         type: Object,
@@ -530,6 +534,21 @@ const sortedTopConsumes = computed(() => {
     });
 });
 
+const isSyncing = ref(false);
+
+const triggerSync = () => {
+    isSyncing.value = true;
+    router.post(route('consume.sync-api'), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            isSyncing.value = false;
+        },
+    });
+};
+
+const refreshData = () => {
+    router.reload({ preserveScroll: true });
+};
 
 </script>
 
@@ -546,6 +565,44 @@ const sortedTopConsumes = computed(() => {
                     <p class="text-xs text-slate-500 mt-0.5">
                         Ringkasan operasional konsumsi, grafik tren harian, dan analisis part paling sering digunakan.
                     </p>
+                </div>
+
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <!-- Floating Last Sync Info Badge -->
+                    <div
+                        v-if="lastSyncAt"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100/90 border border-slate-200/90 text-slate-700 text-xs select-none"
+                    >
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span class="text-slate-500 font-medium">Last sync</span>
+                        <span class="font-bold text-slate-800 font-mono tracking-tight">{{ lastSyncAt }}</span>
+                    </div>
+
+                    <!-- Refresh Button -->
+                    <button
+                        type="button"
+                        @click="refreshData"
+                        class="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white text-xs font-semibold text-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                        title="Muat ulang metrik dashboard"
+                    >
+                        <RefreshCw class="w-3.5 h-3.5 text-slate-500" />
+                        Refresh
+                    </button>
+
+                    <!-- Sync API Button -->
+                    <button
+                        type="button"
+                        @click="triggerSync"
+                        :disabled="isSyncing"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold rounded-lg transition shadow-sm cursor-pointer disabled:opacity-60"
+                        title="Tarik data terbaru dari API eksternal"
+                    >
+                        <RefreshCw :class="['w-3.5 h-3.5', isSyncing ? 'animate-spin' : '']" />
+                        <span>{{ isSyncing ? 'Menarik Data...' : 'Sync API' }}</span>
+                    </button>
                 </div>
             </div>
         </template>

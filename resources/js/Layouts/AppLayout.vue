@@ -95,7 +95,7 @@ const logout = () => {
 
             <!-- Brand Logo Header -->
             <div
-                class="h-16 px-5 bg-slate-950 flex items-center justify-center border-b border-slate-800 relative overflow-hidden"
+                class="px-4 bg-slate-950 flex items-center justify-center border-b border-slate-800 relative"
             >
                 <Link
                     :href="route('dashboard')"
@@ -104,7 +104,7 @@ const logout = () => {
                     <img
                         src="/copa-text.png"
                         alt="COPA - Consumption Part Application"
-                        class="h-10 w-auto max-w-[180px] object-contain"
+                        class="h-24 w-auto max-w-[210px] object-contain"
                     />
                 </Link>
 

@@ -32,7 +32,7 @@ class ConsumeController extends Controller
     public function index(Request $request): Response
     {
         $query = Consume::with([
-            'partNumber:id,pn_baan,description,price_per_unit',
+            'partNumber:id,pn_baan,description',
             'area:id,code,name',
             'machine:id,code,name',
             'creator:id,name',
@@ -69,7 +69,7 @@ class ConsumeController extends Controller
 
         $areas = Area::select('id', 'code', 'name')->whereNull('deleted_at')->orderBy('name')->get();
         $importLogs = ImportLog::with('user:id,name')->orderBy('created_at', 'DESC')->limit(10)->get();
-        $partNumbers = PartNumber::select('id', 'pn_baan', 'description', 'price_per_unit')
+        $partNumbers = PartNumber::select('id', 'pn_baan', 'description')
             ->whereNull('deleted_at')
             ->orderBy('pn_baan')
             ->get();
@@ -109,32 +109,19 @@ class ConsumeController extends Controller
     }
 
     /**
-     * Store a newly created consume record in storage (positive quantity).
+     * Store a newly created consume record in storage (positive/negative quantity).
      */
     public function store(ConsumeRequest $request): RedirectResponse
     {
-        $amount = $request->input('amount');
-        $qty = (int) $request->quantity;
-
-        // Auto-calculate amount if omitted
-        if ($amount === null || $amount === '') {
-            $part = PartNumber::find($request->part_number_id);
-            if ($part && $part->price_per_unit !== null) {
-                $amount = (float) $part->price_per_unit * $qty;
-            } else {
-                $amount = null;
-            }
-        }
-
         Consume::create([
             'part_number_id' => $request->part_number_id,
-            'area_id' => $request->area_id,
-            'machine_id' => $request->machine_id,
-            'quantity' => $qty,
-            'amount' => $amount,
-            'consumed_at' => $request->consumed_at,
-            'source' => 'manual',
-            'created_by' => Auth::id(),
+            'area_id'        => $request->area_id,
+            'machine_id'     => $request->machine_id,
+            'quantity'       => (int) $request->quantity,
+            'amount'         => (float) $request->amount,
+            'consumed_at'    => $request->consumed_at,
+            'source'         => 'manual',
+            'created_by'     => Auth::id(),
         ]);
 
         return redirect()->route('consume.index')->with('success', 'Data consume berhasil ditambahkan');
@@ -145,26 +132,13 @@ class ConsumeController extends Controller
      */
     public function update(ConsumeRequest $request, Consume $consume): RedirectResponse
     {
-        $amount = $request->input('amount');
-        $qty = (int) $request->quantity;
-
-        // Auto-calculate amount if omitted
-        if ($amount === null || $amount === '') {
-            $part = PartNumber::find($request->part_number_id);
-            if ($part && $part->price_per_unit !== null) {
-                $amount = (float) $part->price_per_unit * $qty;
-            } else {
-                $amount = null;
-            }
-        }
-
         $consume->update([
             'part_number_id' => $request->part_number_id,
-            'area_id' => $request->area_id,
-            'machine_id' => $request->machine_id,
-            'quantity' => $qty,
-            'amount' => $amount,
-            'consumed_at' => $request->consumed_at,
+            'area_id'        => $request->area_id,
+            'machine_id'     => $request->machine_id,
+            'quantity'       => (int) $request->quantity,
+            'amount'         => (float) $request->amount,
+            'consumed_at'    => $request->consumed_at,
         ]);
 
         return redirect()->route('consume.index')->with('success', 'Data consume berhasil diperbarui');

@@ -23,9 +23,12 @@ class ConsumeRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'consumed_at'    => ['required', 'date'],
             'part_number_id' => ['required', 'string', 'exists:part_numbers,id'],
-            'area_id' => ['nullable', 'string', 'exists:areas,id'],
-            'machine_id' => [
+            'quantity'       => ['required', 'integer', 'not_in:0'],
+            'amount'         => ['required', 'numeric', 'not_in:0'],
+            'area_id'        => ['nullable', 'string', 'exists:areas,id'],
+            'machine_id'     => [
                 'nullable',
                 'string',
                 'exists:machines,id',
@@ -35,9 +38,6 @@ class ConsumeRequest extends FormRequest
                     }),
                 ]),
             ],
-            'quantity' => ['required', 'integer', 'min:1'],
-            'amount' => ['nullable', 'numeric'],
-            'consumed_at' => ['required', 'date'],
         ];
     }
 
@@ -49,17 +49,18 @@ class ConsumeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'part_number_id.required' => 'Part Number wajib dipilih.',
-            'part_number_id.exists' => 'Part Number tidak valid.',
-            'area_id.exists' => 'Area yang dipilih tidak valid.',
-            'machine_id.exists' => 'Mesin yang dipilih tidak valid atau tidak berada di area yang dipilih.',
-            'quantity.required' => 'Quantity pemakaian wajib diisi.',
-            'quantity.integer' => 'Quantity harus berupa bilangan bulat.',
-            'quantity.min' => 'Quantity pemakaian minimal 1 (angka positif).',
-            'amount.numeric' => 'Amount harus berupa angka.',
             'consumed_at.required' => 'Tanggal consume wajib diisi.',
             'consumed_at.date' => 'Format tanggal consume tidak valid.',
+            'part_number_id.required' => 'Part Number wajib dipilih.',
+            'part_number_id.exists' => 'Part Number tidak valid atau tidak ditemukan.',
+            'quantity.required' => 'Quantity pemakaian wajib diisi.',
+            'quantity.integer' => 'Quantity harus berupa bilangan bulat.',
+            'quantity.not_in' => 'Quantity pemakaian tidak boleh 0.',
+            'amount.required' => 'Nilai Amount (nominal pemakaian) wajib diisi.',
+            'amount.numeric' => 'Amount harus berupa angka numerik.',
+            'amount.not_in' => 'Amount tidak boleh 0.',
+            'area_id.exists' => 'Area yang dipilih tidak valid.',
+            'machine_id.exists' => 'Mesin yang dipilih tidak valid atau tidak berada di area yang dipilih.',
         ];
     }
 }
-

@@ -3,12 +3,10 @@
 namespace App\Jobs;
 
 use App\Imports\ConsumeImport;
-use App\Models\Area;
 use App\Models\Consume;
 use App\Models\ImportLog;
-use App\Models\Machine;
 use App\Models\PartNumber;
-use Carbon\Carbon;
+use App\Support\IndonesianFormatParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -18,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
-use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ImportConsumeJob implements ShouldQueue
 {
@@ -67,8 +64,6 @@ class ImportConsumeJob implements ShouldQueue
 
             DB::transaction(function () use ($rows, &$errors, &$processedCount) {
                 $partCache = [];
-                $areaCache = [];
-                $machineCache = [];
 
                 foreach ($rows as $index => $row) {
                     $rowNumber = $index + 2; // +1 for 0-index, +1 for header row
@@ -80,11 +75,15 @@ class ImportConsumeJob implements ShouldQueue
                         $normalizedRow[$cleanedKey] = $v;
                     }
 
-                    $pnBaanRaw = $normalizedRow['partnumber'] ?? $normalizedRow['pnbaan'] ?? null;
-                    $pnBaan = trim((string) $pnBaanRaw);
+                    $rawDate = $normalizedRow['date'] ?? $normalizedRow['consumedat'] ?? $row['Date'] ?? $row['date'] ?? null;
+                    $rawPn = $normalizedRow['partnumber'] ?? $normalizedRow['pnbaan'] ?? $row['Part Number'] ?? $row['part_number'] ?? $row['pn_baan'] ?? null;
+                    $rawQty = $normalizedRow['qty'] ?? $normalizedRow['quantity'] ?? $row['qty'] ?? $row['quantity'] ?? null;
+                    $rawAmount = $normalizedRow['amount'] ?? $row['Amount'] ?? $row['amount'] ?? null;
+
+                    $pnBaan = trim((string) $rawPn);
 
                     // Skip completely empty rows
-                    if ($pnBaan === '' && empty($normalizedRow['date']) && !isset($normalizedRow['qty'])) {
+                    if ($pnBaan === '' && empty($rawDate) && ($rawQty === null || $rawQty === '') && ($rawAmount === null || $rawAmount === '')) {
                         continue;
                     }
 
@@ -103,65 +102,28 @@ class ImportConsumeJob implements ShouldQueue
                         $errors[] = "Baris {$rowNumber}: Part Number '{$pnBaan}' tidak ditemukan di master data.";
                     }
 
-                    // Optional Area Code
-                    $rawAreaCode = $normalizedRow['areacode'] ?? $normalizedRow['area'] ?? null;
-                    $areaCode = $rawAreaCode !== null && trim((string) $rawAreaCode) !== '' ? trim((string) $rawAreaCode) : null;
-                    $areaId = null;
-
-                    if ($areaCode !== null) {
-                        if (!array_key_exists($areaCode, $areaCache)) {
-                            $areaCache[$areaCode] = Area::where('code', $areaCode)->whereNull('deleted_at')->first();
-                        }
-                        $area = $areaCache[$areaCode];
-                        if (!$area) {
-                            $errors[] = "Baris {$rowNumber}: Area code '{$areaCode}' tidak ditemukan.";
-                        } else {
-                            $areaId = $area->id;
-                        }
-                    }
-
-                    // Optional Machine Code
-                    $rawMachineCode = $normalizedRow['machinecode'] ?? $normalizedRow['machine'] ?? null;
-                    $machineCode = $rawMachineCode !== null && trim((string) $rawMachineCode) !== '' ? trim((string) $rawMachineCode) : null;
-                    $machineId = null;
-
-                    if ($machineCode !== null) {
-                        if (!array_key_exists($machineCode, $machineCache)) {
-                            $machineCache[$machineCode] = Machine::where('code', $machineCode)->whereNull('deleted_at')->first();
-                        }
-                        $machine = $machineCache[$machineCode];
-                        if (!$machine) {
-                            $errors[] = "Baris {$rowNumber}: Machine code '{$machineCode}' tidak ditemukan.";
-                        } else {
-                            if ($areaId && $machine->area_id !== $areaId) {
-                                $errors[] = "Baris {$rowNumber}: Machine '{$machineCode}' tidak berada di area '{$areaCode}'.";
-                            } else {
-                                $machineId = $machine->id;
-                                if (!$areaId && $machine->area_id) {
-                                    $areaId = $machine->area_id;
-                                }
-                            }
-                        }
-                    }
-
                     // Parse Date
-                    $rawDate = $normalizedRow['date'] ?? null;
-                    $consumedAt = $this->parseIndonesianDate($rawDate);
+                    $consumedAt = IndonesianFormatParser::parseDate($rawDate);
                     if (!$consumedAt) {
-                        $errors[] = "Baris {$rowNumber}: Tanggal '{$rawDate}' tidak valid.";
+                        $errors[] = "Baris {$rowNumber}: Format tanggal '{$rawDate}' tidak valid.";
                     }
 
                     // Parse Quantity (allowed negative)
-                    $rawQty = $normalizedRow['qty'] ?? $normalizedRow['quantity'] ?? 0;
-                    $quantity = $this->parseQty($rawQty);
+                    if ($rawQty === null || trim((string) $rawQty) === '') {
+                        $errors[] = "Baris {$rowNumber}: Kolom 'qty' kosong.";
+                    }
+                    $quantity = IndonesianFormatParser::parseQty($rawQty);
+                    if ($quantity === 0) {
+                        $errors[] = "Baris {$rowNumber}: Kolom 'qty' tidak boleh bernilai 0.";
+                    }
 
-                    // Parse Amount (allowed negative)
-                    $rawAmount = $normalizedRow['amount'] ?? null;
-                    $amount = $this->parseAmount($rawAmount);
-
-                    // If amount is null, attempt to calculate from price_per_unit
-                    if ($amount === null && $part && $part->price_per_unit !== null) {
-                        $amount = (float) $part->price_per_unit * abs($quantity);
+                    // Parse Amount (allowed negative, format Indonesia)
+                    if ($rawAmount === null || trim((string) $rawAmount) === '') {
+                        $errors[] = "Baris {$rowNumber}: Kolom 'Amount' kosong.";
+                    }
+                    $amount = IndonesianFormatParser::parseAmount($rawAmount);
+                    if ($amount === null) {
+                        $errors[] = "Baris {$rowNumber}: Format nominal Amount '{$rawAmount}' tidak valid.";
                     }
 
                     // If there are errors so far, we do not insert
@@ -171,8 +133,8 @@ class ImportConsumeJob implements ShouldQueue
 
                     Consume::create([
                         'part_number_id' => $part->id,
-                        'area_id' => $areaId,
-                        'machine_id' => $machineId,
+                        'area_id' => null,
+                        'machine_id' => null,
                         'quantity' => $quantity,
                         'amount' => $amount,
                         'consumed_at' => $consumedAt,
@@ -210,7 +172,6 @@ class ImportConsumeJob implements ShouldQueue
                 ]);
             }
         } finally {
-            // Delete temporary file
             try {
                 Storage::delete($this->filePath);
             } catch (\Throwable $ex) {
@@ -218,90 +179,4 @@ class ImportConsumeJob implements ShouldQueue
             }
         }
     }
-
-    /**
-     * Helper to parse Indonesian date string, DateTime or Excel serial number.
-     */
-    protected function parseIndonesianDate(mixed $val): ?Carbon
-    {
-        if ($val === null || $val === '') {
-            return null;
-        }
-
-        if ($val instanceof \DateTimeInterface) {
-            return Carbon::instance($val)->startOfDay();
-        }
-
-        if (is_numeric($val)) {
-            try {
-                return Carbon::instance(ExcelDate::excelToDateTimeObject($val))->startOfDay();
-            } catch (\Throwable) {
-                // Continue to string parsing
-            }
-        }
-
-        $bulanMap = [
-            'januari' => 1, 'februari' => 2, 'maret' => 3, 'april' => 4,
-            'mei' => 5, 'juni' => 6, 'juli' => 7, 'agustus' => 8,
-            'september' => 9, 'oktober' => 10, 'november' => 11, 'desember' => 12,
-            'jan' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4, 'jun' => 6,
-            'jul' => 7, 'agu' => 8, 'aug' => 8, 'sep' => 9, 'okt' => 10, 'oct' => 10,
-            'nov' => 11, 'des' => 12, 'dec' => 12,
-        ];
-
-        $str = strtolower(trim((string) $val));
-
-        // Format: "1 juli 2026", "15-juli-2026", "01/juli/2026"
-        if (preg_match('/^(\d{1,2})[\s\-\/]+([a-z]+)[\s\-\/]+(\d{4})$/i', $str, $matches)) {
-            $day = (int) $matches[1];
-            $monthStr = strtolower($matches[2]);
-            $year = (int) $matches[3];
-
-            if (isset($bulanMap[$monthStr])) {
-                return Carbon::createFromDate($year, $bulanMap[$monthStr], $day)->startOfDay();
-            }
-        }
-
-        // Standard format fallback: "YYYY-MM-DD" or "DD-MM-YYYY"
-        try {
-            return Carbon::parse($val)->startOfDay();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /**
-     * Helper to clean and parse integer quantity (handles "- 6 ", commas, spaces).
-     */
-    protected function parseQty(mixed $val): int
-    {
-        if (is_int($val)) {
-            return $val;
-        }
-
-        $str = preg_replace('/\s+/', '', (string) $val);
-        $str = str_replace(',', '', $str);
-
-        return is_numeric($str) ? (int) $str : 0;
-    }
-
-    /**
-     * Helper to clean and parse float amount (handles "- 1,143,600 ", commas, spaces).
-     */
-    protected function parseAmount(mixed $val): ?float
-    {
-        if ($val === null || trim((string) $val) === '') {
-            return null;
-        }
-
-        if (is_float($val) || is_int($val)) {
-            return (float) $val;
-        }
-
-        $str = preg_replace('/\s+/', '', (string) $val);
-        $str = str_replace(',', '', $str);
-
-        return is_numeric($str) ? (float) $str : null;
-    }
 }
-
