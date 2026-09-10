@@ -47,3 +47,4 @@ return new class extends Migration
         Schema::dropIfExists('system_error_logs');
     }
 };
+

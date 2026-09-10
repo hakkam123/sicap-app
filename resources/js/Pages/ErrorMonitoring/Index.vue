@@ -209,6 +209,33 @@ const getMethodBadgeClass = (method) => {
     }
 };
 
+const formatUrlPath = (urlStr) => {
+    if (!urlStr) return '-';
+    try {
+        const u = new URL(urlStr, 'http://localhost');
+        return u.pathname + (u.search ? u.search : '');
+    } catch (e) {
+        return urlStr;
+    }
+};
+
+const formatPayload = (payload) => {
+    if (!payload) return 'Tidak ada payload request yang terekam.';
+    if (typeof payload === 'object') {
+        try {
+            return JSON.stringify(payload, null, 2);
+        } catch (e) {
+            return String(payload);
+        }
+    }
+    try {
+        const parsed = JSON.parse(payload);
+        return JSON.stringify(parsed, null, 2);
+    } catch (e) {
+        return String(payload);
+    }
+};
+
 // Detail Modal State & Logic
 const isDetailOpen = ref(false);
 const activeDetailTab = ref('overview'); // 'overview' | 'trace' | 'payload'
@@ -395,7 +422,7 @@ const handleClearAll = () => {
                     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
                         <div>
                             <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                                Server Error (500)
+                                Server Error
                             </span>
                             <p class="text-2xl font-bold text-red-600 mt-1 tabular-nums">
                                 {{ stats.critical_errors }}
@@ -622,7 +649,7 @@ const handleClearAll = () => {
                                                 {{ log.method }}
                                             </span>
                                             <span class="font-mono text-slate-600 text-[11px] truncate max-w-xs" :title="log.url">
-                                                {{ log.url ? new URL(log.url, 'http://localhost').pathname : '-' }}
+                                                {{ formatUrlPath(log.url) }}
                                             </span>
                                         </div>
                                         <p class="font-semibold text-slate-900 line-clamp-1 break-words" :title="log.message">
@@ -889,7 +916,7 @@ const handleClearAll = () => {
                                 Request Headers, Query & Body
                             </span>
 
-                            <pre class="p-4 bg-slate-950 text-slate-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-96 leading-relaxed border border-slate-800 select-all">{{ typeof selectedLog.request_payload === 'object' ? JSON.stringify(selectedLog.request_payload, null, 2) : (selectedLog.request_payload || 'Tidak ada payload request yang terekam.') }}</pre>
+                            <pre class="p-4 bg-slate-950 text-slate-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-96 leading-relaxed border border-slate-800 select-all">{{ formatPayload(selectedLog.request_payload) }}</pre>
                         </div>
 
                     </div>

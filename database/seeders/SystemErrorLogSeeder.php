@@ -128,3 +128,4 @@ class SystemErrorLogSeeder extends Seeder
         }
     }
 }
+

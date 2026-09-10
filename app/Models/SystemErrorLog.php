@@ -107,3 +107,4 @@ class SystemErrorLog extends Model
         return $query;
     }
 }
+
