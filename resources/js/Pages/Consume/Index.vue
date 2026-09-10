@@ -227,12 +227,8 @@ const editingConsumeId = ref(null);
 const isEditing = computed(() => !!editingConsumeId.value);
 const manualSearchQuery = ref('');
 const isPartDropdownOpen = ref(false);
-const manualMachines = ref([]);
-
 const manualForm = useForm({
     part_number_id: '',
-    area_id: '',
-    machine_id: '',
     quantity: 1,
     amount: '',
     consumed_at: new Date().toISOString().split('T')[0],
@@ -257,21 +253,6 @@ const selectPart = (part) => {
     isPartDropdownOpen.value = false;
 };
 
-const handleManualAreaChange = async () => {
-    manualForm.machine_id = '';
-    manualMachines.value = [];
-    if (manualForm.area_id) {
-        try {
-            const res = await fetch(`/consume/machines-by-area?area_id=${manualForm.area_id}`, {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            manualMachines.value = await res.json();
-        } catch (e) {
-            manualMachines.value = [];
-        }
-    }
-};
-
 const openManualModal = () => {
     editingConsumeId.value = null;
     manualForm.reset();
@@ -280,16 +261,13 @@ const openManualModal = () => {
     manualForm.amount = '';
     manualForm.consumed_at = new Date().toISOString().split('T')[0];
     manualSearchQuery.value = '';
-    manualMachines.value = [];
     isManualModalOpen.value = true;
 };
 
-const openEditModal = async (item) => {
+const openEditModal = (item) => {
     editingConsumeId.value = item.id;
     manualForm.clearErrors();
     manualForm.part_number_id = item.part_number_id;
-    manualForm.area_id = item.area_id || '';
-    manualForm.machine_id = item.machine_id || '';
     manualForm.quantity = Math.abs(Number(item.quantity)) || 1;
     manualForm.amount = item.amount !== null && item.amount !== undefined ? Math.abs(Number(item.amount)) : '';
     manualForm.consumed_at = item.consumed_at ? item.consumed_at.split('T')[0] : new Date().toISOString().split('T')[0];
@@ -299,19 +277,6 @@ const openEditModal = async (item) => {
         manualSearchQuery.value = `${part.pn_baan} - ${part.description || ''}`;
     } else {
         manualSearchQuery.value = '';
-    }
-
-    if (item.area_id) {
-        try {
-            const res = await fetch(`/consume/machines-by-area?area_id=${item.area_id}`, {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            manualMachines.value = await res.json();
-        } catch (e) {
-            manualMachines.value = [];
-        }
-    } else {
-        manualMachines.value = [];
     }
 
     isManualModalOpen.value = true;
@@ -909,44 +874,6 @@ const saveSchedules = () => {
                                 * Boleh bernilai negatif.
                             </p>
                             <InputError class="mt-1" :message="manualForm.errors.amount" />
-                        </div>
-                    </div>
-
-                    <!-- Area Dropdown (Opsional) -->
-                    <div class="pt-2 border-t border-slate-100">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <InputLabel for="manual_area" value="Area (Opsional)" />
-                                <select
-                                    id="manual_area"
-                                    v-model="manualForm.area_id"
-                                    @change="handleManualAreaChange"
-                                    class="mt-1 block w-full border-slate-300 rounded-lg text-xs focus:border-blue-500 focus:ring-blue-500"
-                                >
-                                    <option value="">-- Tanpa Area --</option>
-                                    <option v-for="a in areas" :key="a.id" :value="a.id">
-                                        {{ a.name }} ({{ a.code }})
-                                    </option>
-                                </select>
-                                <InputError class="mt-1" :message="manualForm.errors.area_id" />
-                            </div>
-
-                            <!-- Machine Dropdown (Opsional) -->
-                            <div>
-                                <InputLabel for="manual_machine" value="Machine / Station (Opsional)" />
-                                <select
-                                    id="manual_machine"
-                                    v-model="manualForm.machine_id"
-                                    :disabled="!manualForm.area_id || manualMachines.length === 0"
-                                    class="mt-1 block w-full border-slate-300 rounded-lg text-xs focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
-                                >
-                                    <option value="">{{ manualForm.area_id ? '-- Tanpa Machine --' : 'Pilih area terlebih dahulu' }}</option>
-                                    <option v-for="m in manualMachines" :key="m.id" :value="m.id">
-                                        {{ m.name }} ({{ m.code }})
-                                    </option>
-                                </select>
-                                <InputError class="mt-1" :message="manualForm.errors.machine_id" />
-                            </div>
                         </div>
                     </div>
 

@@ -115,8 +115,8 @@ class ConsumeController extends Controller
     {
         Consume::create([
             'part_number_id' => $request->part_number_id,
-            'area_id'        => $request->area_id,
-            'machine_id'     => $request->machine_id,
+            'area_id'        => $request->area_id ?? null,
+            'machine_id'     => $request->machine_id ?? null,
             'quantity'       => (int) $request->quantity,
             'amount'         => (float) $request->amount,
             'consumed_at'    => $request->consumed_at,
@@ -132,14 +132,21 @@ class ConsumeController extends Controller
      */
     public function update(ConsumeRequest $request, Consume $consume): RedirectResponse
     {
-        $consume->update([
+        $updateData = [
             'part_number_id' => $request->part_number_id,
-            'area_id'        => $request->area_id,
-            'machine_id'     => $request->machine_id,
             'quantity'       => (int) $request->quantity,
             'amount'         => (float) $request->amount,
             'consumed_at'    => $request->consumed_at,
-        ]);
+        ];
+
+        if ($request->has('area_id')) {
+            $updateData['area_id'] = $request->area_id;
+        }
+        if ($request->has('machine_id')) {
+            $updateData['machine_id'] = $request->machine_id;
+        }
+
+        $consume->update($updateData);
 
         return redirect()->route('consume.index')->with('success', 'Data consume berhasil diperbarui');
     }
