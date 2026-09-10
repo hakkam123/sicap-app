@@ -341,128 +341,135 @@ const handleClearAll = () => {
         <Head title="Error Monitoring & Log Sistem" />
 
         <template #header>
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h2 class="text-xl font-bold leading-tight text-slate-800 flex items-center gap-2.5">
-                        <Activity class="w-6 h-6 text-red-600" />
-                        <span>Error Monitoring & Log Sistem</span>
-                    </h2>
-                    <p class="text-xs text-slate-500 mt-1">
-                        Pemantauan riwayat log error aplikasi, HTTP status (500, 404, 422), unhandled exceptions, dan integrasi API.
-                    </p>
-                </div>
-
-                <!-- Global Action Buttons -->
-                <div class="flex items-center gap-2 flex-wrap">
-                    <button
-                        v-if="stats.unresolved_errors > 0"
-                        type="button"
-                        @click="showResolveAllModal = true"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                    >
-                        <CheckCheck class="w-4 h-4" />
-                        <span>Tandai Semua Selesai</span>
-                    </button>
-
-                    <button
-                        v-if="stats.total_errors > 0"
-                        type="button"
-                        @click="showClearAllModal = true"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                    >
-                        <Trash2 class="w-3.5 h-3.5" />
-                        <span>Bersihkan Semua Log</span>
-                    </button>
-                </div>
+            <div>
+                <h2 class="text-xl font-bold leading-tight text-slate-800">
+                    Error Monitoring & Log Sistem
+                </h2>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Pemantauan riwayat log error aplikasi, HTTP status (500, 404, 422), unhandled exceptions, dan integrasi API.
+                </p>
             </div>
         </template>
 
         <div class="py-6 px-4 sm:px-6 lg:px-8 space-y-6">
             <div class="max-w-7xl mx-auto space-y-5">
 
-                <!-- 1. KPI SUMMARY CARDS -->
+                <!-- 1. KPI SUMMARY CARDS (Black & Grey Dashboard Style) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Total Errors -->
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                                Total Error Tercatat
-                            </span>
-                            <p class="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
-                                {{ stats.total_errors }}
-                            </p>
-                            <span class="text-[11px] text-slate-400 mt-0.5 block">
-                                Sepanjang waktu
-                            </span>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-                            <AlertOctagon class="w-6 h-6" />
+                    <div class="bg-white rounded-lg border border-slate-200 px-5 py-4">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                                    Total Error Tercatat
+                                </p>
+                                <p class="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
+                                    {{ stats.total_errors }}
+                                </p>
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    Sepanjang waktu
+                                </p>
+                            </div>
+                            <div class="text-slate-300">
+                                <AlertOctagon class="w-5 h-5" />
+                            </div>
                         </div>
                     </div>
 
                     <!-- Errors Today -->
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                                Error Hari Ini
-                            </span>
-                            <p class="text-2xl font-bold text-blue-600 mt-1 tabular-nums">
-                                {{ stats.errors_today }}
-                            </p>
-                            <span class="text-[11px] text-slate-400 mt-0.5 block">
-                                Kejadian 24 jam terakhir
-                            </span>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                            <Calendar class="w-6 h-6" />
+                    <div class="bg-white rounded-lg border border-slate-200 px-5 py-4">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                                    Error Hari Ini
+                                </p>
+                                <p class="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
+                                    {{ stats.errors_today }}
+                                </p>
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    Kejadian 24 jam terakhir
+                                </p>
+                            </div>
+                            <div class="text-slate-300">
+                                <Calendar class="w-5 h-5" />
+                            </div>
                         </div>
                     </div>
 
                     <!-- Critical / 500 Errors -->
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                                Server Error
-                            </span>
-                            <p class="text-2xl font-bold text-red-600 mt-1 tabular-nums">
-                                {{ stats.critical_errors }}
-                            </p>
-                            <span class="text-[11px] text-slate-400 mt-0.5 block">
-                                Exception & Query failure
-                            </span>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
-                            <AlertTriangle class="w-6 h-6" />
+                    <div class="bg-white rounded-lg border border-slate-200 px-5 py-4">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                                    Server Error
+                                </p>
+                                <p class="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
+                                    {{ stats.critical_errors }}
+                                </p>
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    Exception & Query failure
+                                </p>
+                            </div>
+                            <div class="text-slate-300">
+                                <AlertTriangle class="w-5 h-5" />
+                            </div>
                         </div>
                     </div>
 
                     <!-- Unresolved Errors -->
-                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                                Belum Ditangani
-                            </span>
-                            <div class="flex items-center gap-2 mt-1">
-                                <p class="text-2xl font-bold text-amber-600 tabular-nums">
+                    <div class="bg-white rounded-lg border border-slate-200 px-5 py-4">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                                    Belum Ditangani
+                                </p>
+                                <p class="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
                                     {{ stats.unresolved_errors }}
                                 </p>
-                                <span v-if="stats.unresolved_errors > 0" class="relative flex h-2.5 w-2.5">
-                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                                </span>
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    Membutuhkan investigasi
+                                </p>
                             </div>
-                            <span class="text-[11px] text-slate-400 mt-0.5 block">
-                                Membutuhkan investigasi
-                            </span>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-                            <Clock class="w-6 h-6" />
+                            <div class="text-slate-300">
+                                <Clock class="w-5 h-5" />
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. FILTER BAR -->
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <!-- 2. FILTER & ACTION CARD -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <!-- Action Bar Header inside Filter Card -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <Filter class="w-4 h-4 text-slate-500" />
+                            <span class="text-xs font-bold text-slate-800">Filter & Parameter Pencarian</span>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button
+                                v-if="stats.unresolved_errors > 0"
+                                type="button"
+                                @click="showResolveAllModal = true"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                            >
+                                <CheckCheck class="w-3.5 h-3.5" />
+                                <span>Tandai Semua Selesai</span>
+                            </button>
+
+                            <button
+                                v-if="stats.total_errors > 0"
+                                type="button"
+                                @click="showClearAllModal = true"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                            >
+                                <Trash2 class="w-3.5 h-3.5" />
+                                <span>Bersihkan Semua Log</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
                         
                         <!-- Search Pencarian -->
