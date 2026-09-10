@@ -442,8 +442,6 @@ const handleClearAll = () => {
                     <!-- Action Bar Header inside Filter Card -->
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
                         <div class="flex items-center gap-2">
-                            <Filter class="w-4 h-4 text-slate-500" />
-                            <span class="text-xs font-bold text-slate-800">Filter & Parameter Pencarian</span>
                         </div>
 
                         <!-- Action Buttons -->
@@ -454,7 +452,6 @@ const handleClearAll = () => {
                                 @click="showResolveAllModal = true"
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
                             >
-                                <CheckCheck class="w-3.5 h-3.5" />
                                 <span>Tandai Semua Selesai</span>
                             </button>
 
@@ -464,7 +461,6 @@ const handleClearAll = () => {
                                 @click="showClearAllModal = true"
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
                             >
-                                <Trash2 class="w-3.5 h-3.5" />
                                 <span>Bersihkan Semua Log</span>
                             </button>
                         </div>
