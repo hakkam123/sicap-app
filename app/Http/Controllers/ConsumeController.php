@@ -236,13 +236,13 @@ class ConsumeController extends Controller
             $result = $syncService->sync(null, Auth::id());
 
             if (($result['status'] ?? '') === 'warning') {
-                return redirect()->route('consume.index')->with('warning', $result['message']);
+                return redirect()->back()->with('warning', $result['message']);
             }
 
             $count = $result['synced_count'] ?? 0;
-            return redirect()->route('consume.index')->with('success', "Sinkronisasi API berhasil: {$count} data berhasil disinkronkan.");
+            return redirect()->back()->with('success', "Data berhasil diperbarui: {$count} data berhasil disinkronkan.");
         } catch (\Throwable $e) {
-            return redirect()->route('consume.index')->with('error', "Sinkronisasi API gagal: {$e->getMessage()}");
+            return redirect()->back()->with('error', "Pembaruan data gagal: {$e->getMessage()}");
         }
     }
 
