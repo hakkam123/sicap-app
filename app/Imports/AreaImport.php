@@ -10,6 +10,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class AreaImport implements ToArray, WithHeadingRow
 {
+    public int $totalCount = 0;
     public int $successCount = 0;
     public int $updatedCount = 0;
     public int $errorCount = 0;
@@ -20,6 +21,8 @@ class AreaImport implements ToArray, WithHeadingRow
      */
     public function array(array $array): void
     {
+        $this->totalCount = count($array);
+
         DB::transaction(function () use ($array) {
             foreach ($array as $index => $row) {
                 $rowNumber = $index + 2;
@@ -37,13 +40,23 @@ class AreaImport implements ToArray, WithHeadingRow
 
                 if ($code === '') {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'code' wajib diisi.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'code',
+                        'value' => '-',
+                        'message' => "Baris {$rowNumber}: Kolom 'code' wajib diisi.",
+                    ];
                     continue;
                 }
 
                 if ($name === '') {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'name' wajib diisi.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'name',
+                        'value' => '-',
+                        'message' => "Baris {$rowNumber}: Kolom 'name' wajib diisi.",
+                    ];
                     continue;
                 }
 
@@ -70,5 +83,9 @@ class AreaImport implements ToArray, WithHeadingRow
             }
         });
     }
-}
 
+    public function headingRow(): int
+    {
+        return 1;
+    }
+}

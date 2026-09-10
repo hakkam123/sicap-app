@@ -126,7 +126,11 @@ const resetFilters = () => {
     router.get(route('reports.index'), {}, { preserveState: false });
 };
 
-// Export Handlers
+import { useExportWithToast } from '@/composables/useExportWithToast';
+
+const { isExporting, download: downloadExport } = useExportWithToast();
+
+// Export Handlers with Progress Toast
 const exportExcel = () => {
     const params = new URLSearchParams({
         type: 'excel',
@@ -137,7 +141,16 @@ const exportExcel = () => {
         ...(filterForm.value.date_to && { date_to: filterForm.value.date_to }),
     });
 
-    window.location.href = `${route('reports.export')}?${params.toString()}`;
+    const url = `${route('reports.export')}?${params.toString()}`;
+    const filename = `laporan_konsumsi_${filterForm.value.date_from || 'semua'}_${filterForm.value.date_to || 'semua'}.xlsx`;
+
+    downloadExport({
+        url,
+        filename,
+        title: 'Ekspor Laporan Excel',
+        loadingMessage: 'Menyiapkan file laporan Excel konsumsi part...',
+        successMessage: 'Laporan Excel konsumsi part berhasil diunduh.',
+    });
 };
 
 const exportPdf = () => {
@@ -150,7 +163,16 @@ const exportPdf = () => {
         ...(filterForm.value.date_to && { date_to: filterForm.value.date_to }),
     });
 
-    window.location.href = `${route('reports.export')}?${params.toString()}`;
+    const url = `${route('reports.export')}?${params.toString()}`;
+    const filename = `laporan_konsumsi_${filterForm.value.date_from || 'semua'}_${filterForm.value.date_to || 'semua'}.pdf`;
+
+    downloadExport({
+        url,
+        filename,
+        title: 'Ekspor Laporan PDF',
+        loadingMessage: 'Menyiapkan file dokumen PDF laporan konsumsi part...',
+        successMessage: 'Dokumen PDF laporan konsumsi part berhasil diunduh.',
+    });
 };
 
 // Formatters

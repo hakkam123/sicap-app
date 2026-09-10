@@ -13,6 +13,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class ConsumeImport implements ToArray, WithHeadingRow
 {
+    public int $totalCount = 0;
     public int $successCount = 0;
     public int $errorCount = 0;
     public array $errors = [];
@@ -22,6 +23,7 @@ class ConsumeImport implements ToArray, WithHeadingRow
      */
     public function array(array $array): void
     {
+        $this->totalCount = count($array);
         $userId = Auth::id();
 
         DB::transaction(function () use ($array, $userId) {
@@ -50,14 +52,24 @@ class ConsumeImport implements ToArray, WithHeadingRow
                 // 1. Validasi Part Number
                 if ($pnBaan === '') {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'Part Number' wajib diisi.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'Part Number',
+                        'value' => '-',
+                        'message' => "Baris {$rowNumber}: Kolom 'Part Number' wajib diisi.",
+                    ];
                     continue;
                 }
 
                 $partNumber = PartNumber::where('pn_baan', $pnBaan)->first();
                 if (!$partNumber) {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Part Number '{$pnBaan}' tidak ditemukan di master data.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'Part Number',
+                        'value' => $pnBaan,
+                        'message' => "Baris {$rowNumber}: Part Number '{$pnBaan}' tidak ditemukan di master data.",
+                    ];
                     continue;
                 }
 
@@ -65,33 +77,58 @@ class ConsumeImport implements ToArray, WithHeadingRow
                 $consumedAt = IndonesianFormatParser::parseDate($rawDate);
                 if (!$consumedAt) {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Format tanggal '{$rawDate}' tidak valid.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'Date',
+                        'value' => $rawDate,
+                        'message' => "Baris {$rowNumber}: Format tanggal '{$rawDate}' tidak valid.",
+                    ];
                     continue;
                 }
 
                 // 3. Validasi & Parsing Quantity (Integer, boleh bernilai negatif untuk pengeluaran)
                 if ($rawQty === null || trim((string) $rawQty) === '') {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'qty' wajib diisi.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'qty',
+                        'value' => '-',
+                        'message' => "Baris {$rowNumber}: Kolom 'qty' wajib diisi.",
+                    ];
                     continue;
                 }
                 $qty = IndonesianFormatParser::parseQty($rawQty);
                 if ($qty === 0) {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'qty' tidak boleh bernilai 0.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'qty',
+                        'value' => $rawQty,
+                        'message' => "Baris {$rowNumber}: Kolom 'qty' tidak boleh bernilai 0.",
+                    ];
                     continue;
                 }
 
                 // 4. Validasi & Parsing Amount (Format Indonesia: titik ribuan, koma desimal, boleh negatif)
                 if ($rawAmount === null || trim((string) $rawAmount) === '') {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'Amount' wajib diisi.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'Amount',
+                        'value' => '-',
+                        'message' => "Baris {$rowNumber}: Kolom 'Amount' wajib diisi.",
+                    ];
                     continue;
                 }
                 $amount = IndonesianFormatParser::parseAmount($rawAmount);
                 if ($amount === null) {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Format nominal Amount '{$rawAmount}' tidak valid.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'Amount',
+                        'value' => $rawAmount,
+                        'message' => "Baris {$rowNumber}: Format nominal Amount '{$rawAmount}' tidak valid.",
+                    ];
                     continue;
                 }
 

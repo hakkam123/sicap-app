@@ -3,6 +3,7 @@
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ConsumeController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ErrorMonitoringController;
 use App\Http\Controllers\ImportLogController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\MappingController;
@@ -23,6 +24,9 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 Route::middleware('auth')->group(function () {
     // Dashboard Drill-Down
     Route::get('/dashboard/drill-down', [DashboardController::class, 'drillDown'])->name('dashboard.drill-down');
+
+    // Real-time Import Polling Status
+    Route::get('/imports/{importLog}/status', [ErrorMonitoringController::class, 'status'])->name('imports.status');
 
     // Consume Unified & Actions
     Route::get('/consume', [ConsumeController::class, 'index'])->name('consume.index');
@@ -70,9 +74,14 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/mapping/template', [MappingController::class, 'downloadTemplate'])->name('mapping.template');
     Route::get('/mapping-parts/template', [MappingController::class, 'downloadTemplate'])->name('mapping-parts.template');
 
-    // Import Logs
+    // Import Logs & Error Monitoring
     Route::get('/import-logs', [ImportLogController::class, 'index'])->name('import-logs.index');
     Route::get('/import-logs/{importLog}', [ImportLogController::class, 'show'])->name('import-logs.show');
+    Route::get('/import-logs/{importLog}/download-errors', [ErrorMonitoringController::class, 'downloadErrorReport'])->name('import-logs.download-errors');
+
+    Route::get('/error-monitoring', [ErrorMonitoringController::class, 'index'])->name('error-monitoring.index');
+    Route::get('/error-monitoring/{importLog}', [ErrorMonitoringController::class, 'show'])->name('error-monitoring.show');
+    Route::get('/error-monitoring/{importLog}/download-errors', [ErrorMonitoringController::class, 'downloadErrorReport'])->name('error-monitoring.download-errors');
 
     // User Management
     Route::resource('users', UserController::class)->except(['create', 'edit', 'show']);

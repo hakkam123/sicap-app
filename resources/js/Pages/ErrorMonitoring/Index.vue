@@ -10,9 +10,13 @@ import {
     FileText, 
     CheckCircle2, 
     AlertTriangle, 
+    AlertCircle,
     Search, 
     RotateCcw,
-    Download
+    Download,
+    Layers,
+    Clock,
+    Activity
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -52,17 +56,17 @@ const filterForm = ref({
 
 const statusOptions = [
     { label: 'Semua Status', value: '' },
+    { label: 'Failed (Gagal)', value: 'failed' },
+    { label: 'Processing (Diproses)', value: 'processing' },
+    { label: 'Success (Berhasil)', value: 'success' },
     { label: 'Pending', value: 'pending' },
-    { label: 'Processing', value: 'processing' },
-    { label: 'Success', value: 'success' },
-    { label: 'Failed', value: 'failed' },
 ];
 
 // Methods untuk Filter
 const applyFilters = () => {
     isSearching.value = true;
     router.get(
-        route('import-logs.index'),
+        route('error-monitoring.index'),
         { ...filterForm.value },
         { 
             preserveState: true, 
@@ -200,16 +204,17 @@ const handleDownloadErrorExcel = (log) => {
 
 <template>
     <AppLayout>
-        <Head title="Riwayat Import Log" />
+        <Head title="Error Monitoring & Riwayat Import" />
 
         <template #header>
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h2 class="text-xl font-bold leading-tight text-slate-800">
-                        Riwayat Import Log
+                    <h2 class="text-xl font-bold leading-tight text-slate-800 flex items-center gap-2.5">
+                        <Activity class="w-6 h-6 text-red-600" />
+                        <span>Error Monitoring & Audit Import</span>
                     </h2>
                     <p class="text-xs text-slate-500 mt-1">
-                        Monitoring status proses background job dan audit rincian data import Excel.
+                        Monitoring status proses background import data dan audit rincian kesalahan per baris file Excel.
                     </p>
                 </div>
             </div>
@@ -223,9 +228,9 @@ const handleDownloadErrorExcel = (log) => {
                     <div class="flex flex-col lg:flex-row gap-3 items-end">
                         
                         <!-- Search Pencarian -->
-                        <div class="flex-1 min-w-[200px]">
+                        <div class="flex-1 min-w-[180px]">
                             <label for="filter_search" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                Pencarian
+                                Pencarian File / Pesan
                             </label>
                             <div class="relative">
                                 <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -258,7 +263,7 @@ const handleDownloadErrorExcel = (log) => {
                         </div>
 
                         <!-- Dropdown Status -->
-                        <div class="w-full lg:w-32">
+                        <div class="w-full lg:w-36">
                             <label for="filter_status" class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                                 Status
                             </label>
@@ -387,7 +392,7 @@ const handleDownloadErrorExcel = (log) => {
                                     <td colspan="10" class="px-4 py-12 text-center text-slate-400 text-sm">
                                         <div class="flex flex-col items-center justify-center">
                                             <FileText class="w-8 h-8 text-slate-300 mb-2" />
-                                            <span>Tidak ada riwayat import ditemukan.</span>
+                                            <span>Tidak ada log import yang ditemukan.</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -456,6 +461,7 @@ const handleDownloadErrorExcel = (log) => {
                                     </td>
                                     <td class="px-4 py-3 text-xs text-right whitespace-nowrap">
                                         <div class="flex items-center justify-end gap-1.5">
+                                            <!-- Download Error Report Button (if failed/has errors) -->
                                             <button
                                                 v-if="log.failed_rows > 0 || log.status === 'failed'"
                                                 type="button"
@@ -467,6 +473,7 @@ const handleDownloadErrorExcel = (log) => {
                                                 <span>Excel Error</span>
                                             </button>
 
+                                            <!-- Detail Button -->
                                             <button
                                                 type="button"
                                                 @click="openDetailModal(log)"

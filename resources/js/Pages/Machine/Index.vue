@@ -155,19 +155,20 @@ const doDelete = () => {
     });
 };
 
+import { useImportPolling } from '@/composables/useImportPolling';
+
 // ==========================================
 // 5. IMPORT EXCEL MODAL
 // ==========================================
 const isImportModalOpen = ref(false);
 const importFile = ref(null);
 const importInputRef = ref(null);
-const isUploading = ref(false);
-const importErrors = ref([]);
+
+const { isUploading, importErrors, startImport } = useImportPolling();
 
 const openImportModal = () => {
     importFile.value = null;
     importErrors.value = [];
-    isUploading.value = false;
     if (importInputRef.value) importInputRef.value.value = '';
     isImportModalOpen.value = true;
 };
@@ -188,48 +189,18 @@ const handleImportFileChange = (e) => {
     }
 };
 
-const submitImport = async () => {
+const submitImport = () => {
     if (!importFile.value || isUploading.value) return;
 
-    isUploading.value = true;
-    importErrors.value = [];
-
-    const formData = new FormData();
-    formData.append('file', importFile.value);
-
-    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-    try {
-        const response = await fetch(route('machines.import'), {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json',
-                ...(token ? { 'X-CSRF-TOKEN': token } : {}),
-            },
-        });
-
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-            if (Array.isArray(result.errors) && result.errors.length) {
-                importErrors.value = result.errors;
-            } else if (result.message) {
-                importErrors.value = [result.message];
-            } else {
-                importErrors.value = ['Gagal memproses file import. Silakan periksa format data.'];
-            }
-            return;
-        }
-
-        closeImportModal();
-        router.reload({ preserveScroll: true });
-    } catch (err) {
-        importErrors.value = [err.message || 'Terjadi kesalahan saat mengunggah file.'];
-    } finally {
-        isUploading.value = false;
-    }
+    startImport({
+        url: route('machines.import'),
+        file: importFile.value,
+        title: 'Import Machine',
+        onSuccess: () => {
+            closeImportModal();
+            router.reload({ preserveScroll: true });
+        },
+    });
 };
 </script>
 
@@ -531,13 +502,16 @@ const submitImport = async () => {
                 </div>
 
                 <!-- Error Messages Box -->
-                <div v-if="importErrors.length > 0" class="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                <div v-if="importErrors.length > 0" class="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1.5 max-h-48 overflow-y-auto">
                     <div class="flex items-center gap-1.5 font-bold text-red-800">
                         <AlertCircle class="w-4 h-4 flex-shrink-0" />
-                        <span>Terdapat kesalahan pada data import:</span>
+                        <span>Terdapat {{ importErrors.length }} baris bermasalah:</span>
                     </div>
-                    <ul class="list-disc list-inside space-y-0.5 pl-1 text-[11px]">
-                        <li v-for="(err, idx) in importErrors" :key="idx">{{ err }}</li>
+                    <ul class="space-y-1 pl-1 text-[11px]">
+                        <li v-for="(err, idx) in importErrors" :key="idx" class="flex items-start gap-1.5">
+                            <span class="font-bold text-red-900">•</span>
+                            <span>{{ typeof err === 'object' && err !== null ? (err.message || JSON.stringify(err)) : err }}</span>
+                        </li>
                     </ul>
                 </div>
 
@@ -564,8 +538,7 @@ const submitImport = async () => {
                             :disabled="!importFile || isUploading"
                             class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <Upload class="w-3.5 h-3.5" />
-                            <span>{{ isUploading ? 'Mengimpor...' : 'Import Data' }}</span>
+                            <span>{{ isUploading ? 'Mengimpor...' : 'Import' }}</span>
                         </button>
                     </div>
                 </form>

@@ -3,8 +3,11 @@ import { computed, ref, watch } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
+import ToastContainer from '@/Components/UI/ToastContainer.vue';
+import { useToast } from '@/composables/useToast';
 
 const page = usePage();
+const toast = useToast();
 const user = computed(() => page.props.auth?.user);
 const isAdmin = computed(() => user.value?.role === 'admin');
 
@@ -20,23 +23,12 @@ const toggleMasterData = () => {
     isMasterDataOpen.value = !isMasterDataOpen.value;
 };
 
-const dismissedFlash = ref({
-    success: false,
-    error: false,
-});
-
-let successTimer = null;
-let errorTimer = null;
-
+// Sync Inertia flash messages to global toast system
 watch(
     () => page.props.flash?.success,
     (val) => {
         if (val) {
-            dismissedFlash.value.success = false;
-            if (successTimer) clearTimeout(successTimer);
-            successTimer = setTimeout(() => {
-                dismissedFlash.value.success = true;
-            }, 5000);
+            toast.success(val, { title: 'Berhasil' });
         }
     },
     { immediate: true }
@@ -46,25 +38,11 @@ watch(
     () => page.props.flash?.error,
     (val) => {
         if (val) {
-            dismissedFlash.value.error = false;
-            if (errorTimer) clearTimeout(errorTimer);
-            errorTimer = setTimeout(() => {
-                dismissedFlash.value.error = true;
-            }, 7000);
+            toast.error(val, { title: 'Perhatian' });
         }
     },
     { immediate: true }
 );
-
-const dismissSuccess = () => {
-    dismissedFlash.value.success = true;
-    if (successTimer) clearTimeout(successTimer);
-};
-
-const dismissError = () => {
-    dismissedFlash.value.error = true;
-    if (errorTimer) clearTimeout(errorTimer);
-};
 
 const logout = () => {
     router.post(route('logout'));
@@ -256,6 +234,35 @@ const logout = () => {
                     </svg>
 
                     <span>Riwayat Import</span>
+                </Link>
+
+                <!-- Error Monitoring -->
+                <Link
+                    v-if="isAdmin"
+                    :href="route('error-monitoring.index')"
+                    :class="[
+                        'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all',
+                        route().current('error-monitoring.*')
+                            ? 'bg-red-500/20 text-red-200 border border-red-500/30 shadow-sm'
+                            : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    ]"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 text-red-400 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                    </svg>
+
+                    <span>Error Monitoring</span>
                 </Link>
 
 
@@ -704,6 +711,8 @@ const logout = () => {
 
         </div>
 
+        <!-- Global Toast Container -->
+        <ToastContainer />
     </div>
 </template>
 

@@ -10,6 +10,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class PartNumberImport implements ToArray, WithHeadingRow
 {
+    public int $totalCount = 0;
     public int $successCount = 0;
     public int $updatedCount = 0;
     public int $errorCount = 0;
@@ -20,6 +21,8 @@ class PartNumberImport implements ToArray, WithHeadingRow
      */
     public function array(array $array): void
     {
+        $this->totalCount = count($array);
+
         DB::transaction(function () use ($array) {
             foreach ($array as $index => $row) {
                 $rowNumber = $index + 2;
@@ -28,24 +31,20 @@ class PartNumberImport implements ToArray, WithHeadingRow
                 $description = isset($row['description']) && trim((string) $row['description']) !== ''
                     ? trim((string) $row['description'])
                     : null;
-                $pricePerUnit = isset($row['price_per_unit']) && trim((string) $row['price_per_unit']) !== ''
-                    ? (float) str_replace([',', ' '], '', (string) $row['price_per_unit'])
-                    : null;
 
                 // Skip if entire row is empty
-                if ($pnBaan === '' && $description === null && $pricePerUnit === null) {
+                if ($pnBaan === '' && $description === null) {
                     continue;
                 }
 
                 if ($pnBaan === '') {
                     $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'pn_baan' wajib diisi.";
-                    continue;
-                }
-
-                if ($pricePerUnit !== null && $pricePerUnit < 0) {
-                    $this->errorCount++;
-                    $this->errors[] = "Baris {$rowNumber}: Kolom 'price_per_unit' tidak boleh bernilai negatif.";
+                    $this->errors[] = [
+                        'row' => $rowNumber,
+                        'field' => 'pn_baan',
+                        'value' => '-',
+                        'message' => "Baris {$rowNumber}: Kolom 'pn_baan' wajib diisi.",
+                    ];
                     continue;
                 }
 
@@ -54,9 +53,6 @@ class PartNumberImport implements ToArray, WithHeadingRow
                 if ($partNumber) {
                     if ($description !== null) {
                         $partNumber->description = $description;
-                    }
-                    if ($pricePerUnit !== null) {
-                        $partNumber->price_per_unit = $pricePerUnit;
                     }
                     $partNumber->deleted_at = null;
                     $partNumber->save();
@@ -68,7 +64,6 @@ class PartNumberImport implements ToArray, WithHeadingRow
                         'id' => (string) Str::ulid(),
                         'pn_baan' => $pnBaan,
                         'description' => $description,
-                        'price_per_unit' => $pricePerUnit,
                     ]);
 
                     $this->successCount++;
@@ -76,5 +71,9 @@ class PartNumberImport implements ToArray, WithHeadingRow
             }
         });
     }
-}
 
+    public function headingRow(): int
+    {
+        return 1;
+    }
+}
