@@ -14,10 +14,12 @@ const { toasts, dismiss } = useToast();
 </script>
 
 <template>
-    <div
-        aria-live="assertive"
-        class="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
-    >
+    <Teleport to="body">
+        <div
+            aria-live="assertive"
+            class="fixed top-5 right-5 z-[99999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+            style="z-index: 99999 !important;"
+        >
         <TransitionGroup
             enter-active-class="transform ease-out duration-300 transition"
             enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-4"
@@ -141,7 +143,8 @@ const { toasts, dismiss } = useToast();
                 </div>
             </div>
         </TransitionGroup>
-    </div>
+        </div>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -161,3 +164,4 @@ const { toasts, dismiss } = useToast();
     animation: indeterminate 1.5s infinite ease-in-out;
 }
 </style>
+

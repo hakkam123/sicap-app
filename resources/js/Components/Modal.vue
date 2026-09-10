@@ -17,22 +17,17 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
-const dialog = ref();
 const showSlot = ref(props.show);
 
 watch(
     () => props.show,
-    () => {
-        if (props.show) {
+    (val) => {
+        if (val) {
             document.body.style.overflow = 'hidden';
             showSlot.value = true;
-
-            dialog.value?.showModal();
         } else {
             document.body.style.overflow = '';
-
             setTimeout(() => {
-                dialog.value?.close();
                 showSlot.value = false;
             }, 200);
         }
@@ -59,7 +54,6 @@ onMounted(() => document.addEventListener('keydown', closeOnEscape));
 
 onUnmounted(() => {
     document.removeEventListener('keydown', closeOnEscape);
-
     document.body.style.overflow = '';
 });
 
@@ -70,54 +64,60 @@ const maxWidthClass = computed(() => {
         lg: 'sm:max-w-lg',
         xl: 'sm:max-w-xl',
         '2xl': 'sm:max-w-2xl',
-    }[props.maxWidth];
+    }[props.maxWidth] || 'sm:max-w-2xl';
 });
 </script>
 
 <template>
-    <dialog
-        class="z-50 m-0 min-h-full min-w-full overflow-y-auto bg-transparent backdrop:bg-transparent"
-        ref="dialog"
-    >
-        <div
-            class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0"
-            scroll-region
+    <Teleport to="body">
+        <Transition
+            enter-active-class="ease-out duration-300 transition"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="ease-in duration-200 transition"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
         >
-            <Transition
-                enter-active-class="ease-out duration-300"
-                enter-from-class="opacity-0"
-                enter-to-class="opacity-100"
-                leave-active-class="ease-in duration-200"
-                leave-from-class="opacity-100"
-                leave-to-class="opacity-0"
+            <div
+                v-if="show || showSlot"
+                v-show="show"
+                class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0 flex min-h-full items-center justify-center"
+                scroll-region
             >
-                <div
-                    v-show="show"
-                    class="fixed inset-0 transform transition-all"
-                    @click="close"
+                <!-- Backdrop -->
+                <Transition
+                    enter-active-class="ease-out duration-300 transition"
+                    enter-from-class="opacity-0"
+                    enter-to-class="opacity-100"
+                    leave-active-class="ease-in duration-200 transition"
+                    leave-from-class="opacity-100"
+                    leave-to-class="opacity-0"
                 >
                     <div
-                        class="absolute inset-0 bg-gray-500 opacity-75"
+                        v-show="show"
+                        class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+                        @click="close"
                     />
-                </div>
-            </Transition>
+                </Transition>
 
-            <Transition
-                enter-active-class="ease-out duration-300"
-                enter-from-class="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                enter-to-class="opacity-100 translate-y-0 sm:scale-100"
-                leave-active-class="ease-in duration-200"
-                leave-from-class="opacity-100 translate-y-0 sm:scale-100"
-                leave-to-class="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            >
-                <div
-                    v-show="show"
-                    class="mb-6 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all sm:mx-auto sm:w-full"
-                    :class="maxWidthClass"
+                <!-- Modal Box -->
+                <Transition
+                    enter-active-class="ease-out duration-300 transition"
+                    enter-from-class="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    enter-to-class="opacity-100 translate-y-0 sm:scale-100"
+                    leave-active-class="ease-in duration-200 transition"
+                    leave-from-class="opacity-100 translate-y-0 sm:scale-100"
+                    leave-to-class="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                 >
-                    <slot v-if="showSlot" />
-                </div>
-            </Transition>
-        </div>
-    </dialog>
+                    <div
+                        v-show="show"
+                        class="relative mb-6 transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all sm:mx-auto sm:w-full z-10"
+                        :class="maxWidthClass"
+                    >
+                        <slot v-if="showSlot" />
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+    </Teleport>
 </template>
