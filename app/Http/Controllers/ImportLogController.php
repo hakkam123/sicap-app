@@ -77,4 +77,39 @@ class ImportLogController extends Controller
             'log' => $importLog,
         ]);
     }
+
+    /**
+     * Real-time polling status endpoint for import jobs.
+     */
+    public function status(ImportLog $importLog): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'id' => $importLog->id,
+            'feature' => $importLog->feature,
+            'feature_label' => $importLog->feature_label,
+            'filename' => $importLog->filename,
+            'status' => $importLog->status,
+            'total_rows' => $importLog->total_rows,
+            'processed_rows' => $importLog->processed_rows,
+            'success_rows' => $importLog->success_rows,
+            'failed_rows' => $importLog->failed_rows,
+            'progress_percentage' => $importLog->progress_percentage,
+            'error_message' => $importLog->error_message,
+            'error_details' => $importLog->error_details,
+            'started_at' => $importLog->started_at?->toIso8601String(),
+            'finished_at' => $importLog->finished_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Download Excel report for import errors.
+     */
+    public function downloadErrorReport(ImportLog $importLog): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $feature = $importLog->feature ?: 'import';
+        $timestamp = now()->format('Ymd_His');
+        $filename = "laporan_error_import_{$feature}_{$timestamp}.xlsx";
+
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\ImportErrorExport($importLog), $filename);
+    }
 }

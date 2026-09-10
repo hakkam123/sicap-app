@@ -74,14 +74,18 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/mapping/template', [MappingController::class, 'downloadTemplate'])->name('mapping.template');
     Route::get('/mapping-parts/template', [MappingController::class, 'downloadTemplate'])->name('mapping-parts.template');
 
-    // Import Logs & Error Monitoring
+    // Riwayat Import (File Excel History)
     Route::get('/import-logs', [ImportLogController::class, 'index'])->name('import-logs.index');
     Route::get('/import-logs/{importLog}', [ImportLogController::class, 'show'])->name('import-logs.show');
-    Route::get('/import-logs/{importLog}/download-errors', [ErrorMonitoringController::class, 'downloadErrorReport'])->name('import-logs.download-errors');
+    Route::get('/import-logs/{importLog}/download-errors', [ImportLogController::class, 'downloadErrorReport'])->name('import-logs.download-errors');
 
+    // Error Monitoring (System & Application Error Logs)
     Route::get('/error-monitoring', [ErrorMonitoringController::class, 'index'])->name('error-monitoring.index');
-    Route::get('/error-monitoring/{importLog}', [ErrorMonitoringController::class, 'show'])->name('error-monitoring.show');
-    Route::get('/error-monitoring/{importLog}/download-errors', [ErrorMonitoringController::class, 'downloadErrorReport'])->name('error-monitoring.download-errors');
+    Route::get('/error-monitoring/{errorLog}', [ErrorMonitoringController::class, 'show'])->name('error-monitoring.show');
+    Route::post('/error-monitoring/{errorLog}/resolve', [ErrorMonitoringController::class, 'resolve'])->name('error-monitoring.resolve');
+    Route::post('/error-monitoring/resolve-all', [ErrorMonitoringController::class, 'resolveAll'])->name('error-monitoring.resolve-all');
+    Route::delete('/error-monitoring/{errorLog}', [ErrorMonitoringController::class, 'destroy'])->name('error-monitoring.destroy');
+    Route::delete('/error-monitoring/clear-all', [ErrorMonitoringController::class, 'clearAll'])->name('error-monitoring.clear-all');
 
     // User Management
     Route::resource('users', UserController::class)->except(['create', 'edit', 'show']);

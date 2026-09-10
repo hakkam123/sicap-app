@@ -31,6 +31,11 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
+        // Capture unhandled exceptions into system_error_logs table
+        $exceptions->report(function (\Throwable $e) {
+            \App\Services\SystemErrorLogService::captureException($e);
+        });
+
         // Global handler untuk exception 429 Too Many Requests
         $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
