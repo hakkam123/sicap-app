@@ -6,9 +6,7 @@ import Pagination from '@/Components/Pagination.vue';
 import {
     Search,
     RotateCcw,
-    Boxes,
     Calendar,
-    Coins,
     FileSpreadsheet,
     FileText,
 } from 'lucide-vue-next';
@@ -209,50 +207,7 @@ const formatNumber = (val) => {
 
         <div class="py-6 px-4 sm:px-6 lg:px-8 space-y-6">
 
-            <!-- 1. SUMMARY CARDS (Top) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- Card 1: Total Qty -->
-                <div class="bg-white rounded-lg border border-slate-200 px-5 py-4 shadow-sm">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                                Total Qty Terpakai
-                            </p>
-                            <p class="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                                {{ formatNumber(summary.total_qty) }}
-                            </p>
-                            <p class="text-[11px] text-slate-400 mt-1">
-                                Akumulasi unit sparepart dari data yang difilter
-                            </p>
-                        </div>
-                        <div class="text-slate-300">
-                            <Boxes class="w-8 h-8 stroke-[1.5]" />
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card 2: Total Amount -->
-                <div class="bg-white rounded-lg border border-slate-200 px-5 py-4 shadow-sm">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                                Total Nilai Pemakaian
-                            </p>
-                            <p class="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                                {{ formatRupiah(summary.total_amount) }}
-                            </p>
-                            <p class="text-[11px] text-slate-400 mt-1">
-                                Estimasi nilai pemakaian dari data yang difilter
-                            </p>
-                        </div>
-                        <div class="text-slate-300">
-                            <Coins class="w-8 h-8 stroke-[1.5]" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. FILTER & ACTION CARD (Below Summary Cards) -->
+            <!-- 1. FILTER & ACTION CARD -->
             <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
                 <!-- Header Toolbar with Export Buttons -->
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
@@ -420,7 +375,7 @@ const formatNumber = (val) => {
                 </div>
             </div>
 
-            <!-- 3. TABEL DATA LAPORAN -->
+            <!-- 2. TABEL DATA LAPORAN -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 
                 <!-- Table Header Bar -->
