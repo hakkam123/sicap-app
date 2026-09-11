@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { Head, router, Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import Pagination from '@/Components/Pagination.vue';
+import DataTable from '@/Components/Table/DataTable.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import ConfirmModal from '@/Components/UI/ConfirmModal.vue';
 import { 
@@ -131,6 +131,44 @@ const formatTimeAgo = (isoString) => {
     if (diff < 3600) return `${Math.floor(diff / 60)} mnt lalu`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`;
     return `${Math.floor(diff / 86400)} hari lalu`;
+};
+
+// ==========================================
+// TABLE COLUMNS & LABEL MAPPINGS
+// ==========================================
+const tableColumns = [
+    { key: 'created_at', label: 'Waktu Kejadian', width: 'w-44' },
+    { key: 'status_code', label: 'Status Code', align: 'center', width: 'w-36' },
+    { key: 'feature', label: 'Fitur', align: 'center', width: 'w-32' },
+    { key: 'message', label: 'Pesan Error & URL' },
+    { key: 'user_info', label: 'User / IP', width: 'w-36' },
+    { key: 'status', label: 'Status', align: 'center', width: 'w-32' },
+];
+
+const getSeverityLabel = (severity, statusCode) => {
+    if (statusCode >= 500 || severity === 'critical') {
+        return statusCode ? `${statusCode} Server Error` : 'Critical';
+    }
+    if (statusCode === 404) return '404 Not Found';
+    if (statusCode === 403) return '403 Forbidden';
+    if (statusCode === 401) return '401 Unauthorized';
+    if (statusCode === 422) return '422 Validation';
+    return statusCode ? `HTTP ${statusCode}` : (severity || 'Error');
+};
+
+const getFeatureLabel = (feature) => {
+    const map = {
+        consume: 'Consume',
+        part_number: 'Part Number',
+        area: 'Area',
+        machine: 'Machine',
+        mapping: 'Mapping',
+        user: 'User',
+        sync_api: 'Sync API',
+        auth: 'Auth',
+        general: 'General',
+    };
+    return map[feature] || (feature ? feature.toUpperCase() : 'Sistem');
 };
 
 const getFeatureBadgeClass = (feature) => {
@@ -563,172 +601,82 @@ const handleClearAll = () => {
                     </div>
                 </div>
 
-                <!-- 3. DATA TABLE CARD -->
-                <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-slate-200">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200">
-                            <thead class="bg-slate-50/80">
-                                <tr>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-12">
-                                        No
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-44">
-                                        Waktu Kejadian
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-36">
-                                        Status Code
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-36">
-                                        Fitur
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Pesan Error & URL
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-36">
-                                        User / IP
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-32">
-                                        Status
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-36">
-                                        Aksi
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-slate-100">
-                                <tr v-if="logs.data.length === 0">
-                                    <td colspan="8" class="px-4 py-12 text-center text-slate-400 text-sm">
-                                        <div class="flex flex-col items-center justify-center">
-                                            <CheckCircle2 class="w-8 h-8 text-emerald-500 mb-2" />
-                                            <span class="font-semibold text-slate-700">Tidak ada log error yang ditemukan.</span>
-                                            <span class="text-xs text-slate-400 mt-0.5">Sistem berjalan dengan normal tanpa kendala yang belum terselesaikan.</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-for="(log, idx) in logs.data"
-                                    :key="log.id"
-                                    class="hover:bg-slate-50/70 transition-colors"
-                                >
-                                    <!-- No -->
-                                    <td class="px-4 py-3 text-xs text-slate-500 text-center font-medium">
-                                        {{ (logs.current_page - 1) * logs.per_page + idx + 1 }}
-                                    </td>
+                <!-- 3. DATA TABLE -->
+                <DataTable
+                    :columns="tableColumns"
+                    :data="logs"
+                >
+                    <template #cell-created_at="{ value }">
+                        <div class="text-slate-800">{{ formatDate(value) }}</div>
+                        <div class="text-[11px] text-slate-400">{{ formatTimeAgo(value) }}</div>
+                    </template>
 
-                                    <!-- Waktu -->
-                                    <td class="px-4 py-3 text-xs whitespace-nowrap">
-                                        <div class="font-medium text-slate-900">{{ formatDate(log.created_at) }}</div>
-                                        <div class="text-[11px] text-slate-400">{{ formatTimeAgo(log.created_at) }}</div>
-                                    </td>
+                    <template #cell-status_code="{ row }">
+                        <span class="font-mono text-slate-700">{{ getSeverityLabel(row.severity, row.status_code) }}</span>
+                    </template>
 
-                                    <!-- Status Code Badge -->
-                                    <td class="px-4 py-3 text-xs text-center whitespace-nowrap">
-                                        <span
-                                            class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border"
-                                            :class="getSeverityBadge(log.severity, log.status_code).class"
-                                        >
-                                            {{ getSeverityBadge(log.severity, log.status_code).label }}
-                                        </span>
-                                    </td>
+                    <template #cell-feature="{ row }">
+                        <span class="text-slate-700">{{ row.feature_label || getFeatureLabel(row.feature) }}</span>
+                    </template>
 
-                                    <!-- Fitur -->
-                                    <td class="px-4 py-3 text-xs text-center whitespace-nowrap">
-                                        <span
-                                            class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border"
-                                            :class="getFeatureBadgeClass(log.feature)"
-                                        >
-                                            {{ log.feature_label || log.feature || 'Sistem' }}
-                                        </span>
-                                    </td>
+                    <template #cell-message="{ row }">
+                        <div class="max-w-md">
+                            <div class="flex items-center gap-1.5 mb-0.5 text-xs">
+                                <span v-if="row.method" class="font-mono font-bold text-slate-700 text-[10px]">{{ row.method }}</span>
+                                <span class="font-mono text-slate-600 text-[11px] truncate max-w-xs" :title="row.url">{{ formatUrlPath(row.url) }}</span>
+                            </div>
+                            <p class="font-semibold text-slate-900 line-clamp-1 break-words" :title="row.message">
+                                {{ row.message }}
+                            </p>
+                            <p v-if="row.file" class="text-[10px] text-slate-400 font-mono truncate mt-0.5" :title="`${row.file}:${row.line}`">
+                                {{ row.file }}:{{ row.line }}
+                            </p>
+                        </div>
+                    </template>
 
-                                    <!-- Pesan Error & URL -->
-                                    <td class="px-4 py-3 text-xs max-w-md">
-                                        <div class="flex items-center gap-1.5 mb-0.5">
-                                            <span
-                                                v-if="log.method"
-                                                class="px-1.5 py-0.2 rounded font-mono font-bold text-[10px] border"
-                                                :class="getMethodBadgeClass(log.method)"
-                                            >
-                                                {{ log.method }}
-                                            </span>
-                                            <span class="font-mono text-slate-600 text-[11px] truncate max-w-xs" :title="log.url">
-                                                {{ formatUrlPath(log.url) }}
-                                            </span>
-                                        </div>
-                                        <p class="font-semibold text-slate-900 line-clamp-1 break-words" :title="log.message">
-                                            {{ log.message }}
-                                        </p>
-                                        <p v-if="log.file" class="text-[10px] text-slate-400 font-mono truncate mt-0.5" :title="`${log.file}:${log.line}`">
-                                            {{ log.file }}:{{ log.line }}
-                                        </p>
-                                    </td>
+                    <template #cell-user_info="{ row }">
+                        <div class="text-slate-800 font-medium truncate">{{ row.user?.name || 'Guest / Sistem' }}</div>
+                        <div class="text-[10px] font-mono text-slate-400">{{ row.user_ip || '-' }}</div>
+                    </template>
 
-                                    <!-- User / IP -->
-                                    <td class="px-4 py-3 text-xs whitespace-nowrap">
-                                        <div class="font-medium text-slate-800 truncate">
-                                            {{ log.user?.name || 'Guest / Sistem' }}
-                                        </div>
-                                        <div class="text-[10px] font-mono text-slate-400">
-                                            {{ log.user_ip || '-' }}
-                                        </div>
-                                    </td>
+                    <template #cell-status="{ row }">
+                        <span class="text-slate-700">{{ row.status === 'resolved' ? 'Selesai' : 'Belum Ditangani' }}</span>
+                    </template>
 
-                                    <!-- Status Penanganan -->
-                                    <td class="px-4 py-3 text-xs text-center whitespace-nowrap">
-                                        <button
-                                            type="button"
-                                            @click="toggleResolve(log)"
-                                            class="cursor-pointer transition-transform hover:scale-105"
-                                            :title="log.status === 'resolved' ? 'Klik untuk tandai belum selesai' : 'Klik untuk tandai selesai'"
-                                        >
-                                            <span
-                                                v-if="log.status === 'resolved'"
-                                                class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200"
-                                            >
-                                                <Check class="w-3 h-3" />
-                                                <span>Selesai</span>
-                                            </span>
-                                            <span
-                                                v-else
-                                                class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200"
-                                            >
-                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                                <span>Unresolved</span>
-                                            </span>
-                                        </button>
-                                    </td>
+                    <template #actions="{ row }">
+                        <div class="flex items-center justify-end">
+                            <button
+                                type="button"
+                                @click="openDetailModal(row)"
+                                class="text-blue-600 hover:text-blue-900 hover:underline font-semibold inline-flex items-center gap-1 text-xs"
+                            >
+                                Detail
+                            </button>
+                            <button
+                                type="button"
+                                @click="toggleResolve(row)"
+                                class="text-slate-600 hover:text-slate-900 hover:underline font-semibold inline-flex items-center gap-1 text-xs ml-3"
+                            >
+                                {{ row.status === 'resolved' ? 'Buka' : 'Selesai' }}
+                            </button>
+                            <button
+                                type="button"
+                                @click="confirmDeleteLog(row)"
+                                class="text-red-600 hover:text-red-900 hover:underline font-semibold inline-flex items-center gap-1 text-xs ml-3"
+                            >
+                                Hapus
+                            </button>
+                        </div>
+                    </template>
 
-                                    <!-- Aksi -->
-                                    <td class="px-4 py-3 text-xs text-right whitespace-nowrap">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <button
-                                                type="button"
-                                                @click="openDetailModal(log)"
-                                                class="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition inline-flex items-center gap-1 shadow-2xs cursor-pointer"
-                                            >
-                                                <span>Detail</span>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                @click="confirmDeleteLog(log)"
-                                                class="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                                                title="Hapus log"
-                                            >
-                                                <Trash2 class="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/40">
-                        <Pagination :links="logs.links" />
-                    </div>
-                </div>
+                    <template #empty>
+                        <div class="flex flex-col items-center justify-center py-6">
+                            <CheckCircle2 class="w-8 h-8 text-emerald-500 mb-2" />
+                            <span class="font-semibold text-slate-700">Tidak ada log error yang ditemukan.</span>
+                            <span class="text-xs text-slate-400 mt-0.5">Sistem berjalan dengan normal tanpa kendala yang belum terselesaikan.</span>
+                        </div>
+                    </template>
+                </DataTable>
 
             </div>
         </div>

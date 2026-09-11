@@ -307,16 +307,20 @@ const submitImport = () => {
                 :data="areas"
             >
                 <template #cell-code="{ value }">
-                    <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded font-bold text-slate-800">{{ value }}</span>
+                    <span class="font-mono text-slate-700">{{ value }}</span>
+                </template>
+
+                <template #cell-description="{ value }">
+                    <span class="text-slate-600">{{ value || '-' }}</span>
                 </template>
 
                 <template #cell-machines_count="{ value }">
-                    <span class="bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded text-xs">
-                        {{ value }} mesin
+                    <span class="text-slate-700">
+                        {{ value || 0 }} mesin
                     </span>
                 </template>
 
-                <template #actions="{ row }">
+                <template v-if="isAdmin" #actions="{ row }">
                     <button
                         type="button"
                         @click="openEditModal(row)"

@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import Pagination from '@/Components/Pagination.vue';
+import DataTable from '@/Components/Table/DataTable.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { useExportWithToast } from '@/composables/useExportWithToast';
 import { 
@@ -38,6 +38,45 @@ const props = defineProps({
 });
 
 const { download } = useExportWithToast();
+
+// Table Columns
+const tableColumns = [
+    { key: 'filename', label: 'Nama File', minWidth: 'min-w-[200px]' },
+    { key: 'feature', label: 'Fitur', align: 'center', width: 'w-28' },
+    { key: 'status', label: 'Status', align: 'center', width: 'w-28' },
+    { key: 'total_rows', label: 'Total Baris', align: 'center', width: 'w-24' },
+    { key: 'success_rows', label: 'Berhasil', align: 'center', width: 'w-24' },
+    { key: 'failed_rows', label: 'Gagal', align: 'center', width: 'w-24' },
+    { key: 'user.name', label: 'Diupload Oleh', width: 'w-36' },
+    { key: 'created_at', label: 'Waktu Upload', width: 'w-36' },
+];
+
+const getFeatureLabel = (feature) => {
+    const map = {
+        consume: 'Consume',
+        part_number: 'Part Number',
+        area: 'Area',
+        machine: 'Machine',
+        mapping: 'Mapping',
+        user: 'User',
+    };
+    return map[feature] || (feature ? feature.toUpperCase() : '-');
+};
+
+const getStatusLabel = (status) => {
+    switch (status) {
+        case 'success':
+            return 'Success';
+        case 'processing':
+            return 'Processing';
+        case 'pending':
+            return 'Pending';
+        case 'failed':
+            return 'Failed';
+        default:
+            return status || '-';
+    }
+};
 
 // Filter States & Form
 const isSearching = ref(false);
@@ -102,23 +141,6 @@ const formatFullDate = (isoString) => {
         dateStyle: 'full',
         timeStyle: 'medium',
     });
-};
-
-const getFeatureBadgeClass = (feature) => {
-    switch (feature) {
-        case 'consume':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'part_number':
-            return 'bg-purple-100 text-purple-800 border-purple-200';
-        case 'area':
-            return 'bg-amber-100 text-amber-800 border-amber-200';
-        case 'machine':
-            return 'bg-cyan-100 text-cyan-800 border-cyan-200';
-        case 'mapping':
-            return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-        default:
-            return 'bg-slate-100 text-slate-800 border-slate-200';
-    }
 };
 
 // Detail Modal State & Logic
@@ -345,151 +367,70 @@ const handleDownloadErrorExcel = (log) => {
                 </div>
 
                 <!-- Table Card -->
-                <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-slate-200">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200">
-                            <thead class="bg-slate-50/80">
-                                <tr>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-12">
-                                        No
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Nama File
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Fitur
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Total Baris
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Berhasil
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Gagal
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Diupload Oleh
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Waktu Upload
-                                    </th>
-                                    <th scope="col" class="px-4 py-3.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        Aksi
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-slate-100">
-                                <tr v-if="logs.data.length === 0">
-                                    <td colspan="10" class="px-4 py-12 text-center text-slate-400 text-sm">
-                                        <div class="flex flex-col items-center justify-center">
-                                            <FileText class="w-8 h-8 text-slate-300 mb-2" />
-                                            <span>Tidak ada riwayat import ditemukan.</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-for="(log, idx) in logs.data"
-                                    :key="log.id"
-                                    class="hover:bg-slate-50/70 transition-colors"
-                                >
-                                    <td class="px-4 py-3 text-xs text-slate-500 text-center font-medium">
-                                        {{ (logs.current_page - 1) * logs.per_page + idx + 1 }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs font-medium text-slate-900 max-w-xs truncate" :title="log.filename">
-                                        <div class="flex items-center gap-2">
-                                            <FileText class="w-4 h-4 text-slate-400 shrink-0" />
-                                            <span class="truncate font-semibold">{{ log.filename }}</span>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-center whitespace-nowrap">
-                                        <span
-                                            class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border"
-                                            :class="getFeatureBadgeClass(log.feature)"
-                                        >
-                                            {{ log.feature_label || log.feature }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-center whitespace-nowrap">
-                                        <span
-                                            v-if="log.status === 'success'"
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200/60"
-                                        >
-                                            Success
-                                        </span>
-                                        <span
-                                            v-else-if="log.status === 'processing'"
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200/60 animate-pulse"
-                                        >
-                                            Processing
-                                        </span>
-                                        <span
-                                            v-else-if="log.status === 'pending'"
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200"
-                                        >
-                                            Pending
-                                        </span>
-                                        <span
-                                            v-else
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200/60"
-                                        >
-                                            Failed
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-center font-medium text-slate-700 tabular-nums">
-                                        {{ log.total_rows }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-center font-bold tabular-nums text-emerald-700">
-                                        {{ log.success_rows }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-center font-bold tabular-nums" :class="log.failed_rows > 0 ? 'text-red-700' : 'text-slate-400'">
-                                        {{ log.failed_rows }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-slate-600">
-                                        {{ log.user?.name || '-' }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-                                        {{ formatDate(log.created_at) }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs text-right whitespace-nowrap">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <button
-                                                v-if="log.failed_rows > 0 || log.status === 'failed'"
-                                                type="button"
-                                                @click="handleDownloadErrorExcel(log)"
-                                                class="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 font-semibold transition inline-flex items-center gap-1 border border-red-200"
-                                                title="Unduh Laporan Error Excel"
-                                            >
-                                                <Download class="w-3.5 h-3.5" />
-                                                <span>Excel Error</span>
-                                            </button>
+                <DataTable
+                    :columns="tableColumns"
+                    :data="logs"
+                >
+                    <template #cell-filename="{ value }">
+                        <span class="font-medium text-slate-900 truncate" :title="value">{{ value }}</span>
+                    </template>
 
-                                            <button
-                                                type="button"
-                                                @click="openDetailModal(log)"
-                                                class="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                </svg>
-                                                Detail
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <template #cell-feature="{ row }">
+                        <span class="text-slate-700">{{ row.feature_label || getFeatureLabel(row.feature) }}</span>
+                    </template>
 
-                    <!-- Pagination -->
-                    <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/40">
-                        <Pagination :links="logs.links" />
-                    </div>
-                </div>
+                    <template #cell-status="{ value }">
+                        <span class="text-slate-700">{{ getStatusLabel(value) }}</span>
+                    </template>
+
+                    <template #cell-total_rows="{ value }">
+                        <span class="text-slate-700 tabular-nums">{{ value || 0 }}</span>
+                    </template>
+
+                    <template #cell-success_rows="{ value }">
+                        <span class="text-slate-700 tabular-nums font-semibold">{{ value || 0 }}</span>
+                    </template>
+
+                    <template #cell-failed_rows="{ value }">
+                        <span class="text-slate-700 tabular-nums font-semibold">{{ value || 0 }}</span>
+                    </template>
+
+                    <template #cell-user.name="{ row }">
+                        <span class="text-slate-700">{{ row.user?.name || '-' }}</span>
+                    </template>
+
+                    <template #cell-created_at="{ value }">
+                        <span class="text-slate-700 whitespace-nowrap">{{ formatDate(value) }}</span>
+                    </template>
+
+                    <template #actions="{ row }">
+                        <div class="flex items-center justify-end">
+                            <button
+                                v-if="row.failed_rows > 0 || row.status === 'failed'"
+                                type="button"
+                                @click="handleDownloadErrorExcel(row)"
+                                class="text-red-600 hover:text-red-900 hover:underline font-semibold inline-flex items-center gap-1 text-xs"
+                            >
+                                Excel Error
+                            </button>
+                            <button
+                                type="button"
+                                @click="openDetailModal(row)"
+                                class="text-blue-600 hover:text-blue-900 hover:underline font-semibold inline-flex items-center gap-1 text-xs"
+                                :class="{ 'ml-3': row.failed_rows > 0 || row.status === 'failed' }"
+                            >
+                                Detail
+                            </button>
+                        </div>
+                    </template>
+
+                    <template #empty>
+                        <div class="flex flex-col items-center justify-center py-6 text-slate-400">
+                            <FileText class="w-8 h-8 text-slate-300 mb-2" />
+                            <span class="font-semibold text-slate-700">Tidak ada riwayat import ditemukan.</span>
+                        </div>
+                    </template>
+                </DataTable>
             </div>
         </div>
 

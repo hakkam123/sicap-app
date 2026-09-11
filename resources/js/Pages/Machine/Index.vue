@@ -71,7 +71,7 @@ const resetFilter = () => {
 const tableColumns = [
     { key: 'code', label: 'Kode', width: 'w-36' },
     { key: 'name', label: 'Nama Machine' },
-    { key: 'area', label: 'Area', width: 'w-44' },
+    { key: 'area.name', label: 'Area', width: 'w-44' },
     { key: 'description', label: 'Deskripsi' },
 ];
 
@@ -342,17 +342,21 @@ const submitImport = () => {
                 :data="machines"
             >
                 <template #cell-code="{ value }">
-                    <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded font-bold text-slate-800">{{ value }}</span>
+                    <span class="font-mono text-slate-700">{{ value }}</span>
                 </template>
 
-                <template #cell-area="{ row }">
-                    <span v-if="row.area" class="font-medium text-slate-800">
-                        {{ row.area?.name }}
+                <template #cell-area\.name="{ row }">
+                    <span v-if="row.area" class="text-slate-700">
+                        {{ row.area.name }}
                     </span>
-                    <span v-else class="text-slate-400 italic text-xs">Tanpa Area</span>
+                    <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>
 
-                <template #actions="{ row }">
+                <template #cell-description="{ value }">
+                    <span class="text-slate-600">{{ value || '-' }}</span>
+                </template>
+
+                <template v-if="isAdmin" #actions="{ row }">
                     <button
                         type="button"
                         @click="openEditModal(row)"

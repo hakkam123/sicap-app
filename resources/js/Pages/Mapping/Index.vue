@@ -591,53 +591,43 @@ const submitImportForm = () => {
                     :columns="mappingColumns"
                     :data="mappings"
                 >
-
                     <template #cell-pn_baan="{ value }">
-                        <span
-                            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200"
-                        >
+                        <span class="font-mono font-bold text-slate-700 whitespace-nowrap">
                             {{ value }}
                         </span>
                     </template>
 
-
                     <template #cell-part_desc="{ value }">
                         <span
-                            class="text-slate-700 max-w-sm truncate block"
+                            class="text-slate-600 max-w-sm truncate block"
                             :title="value"
                         >
                             {{ value || '-' }}
                         </span>
                     </template>
 
-
                     <template #cell-area_name="{ row }">
-                        <span class="font-medium text-slate-800">
+                        <span class="text-slate-700">
                             {{ row.area_name }}
                         </span>
                     </template>
 
-
                     <template #cell-machine_name="{ row }">
-
                         <span
                             v-if="row.machine_name"
-                            class="font-medium text-slate-800"
+                            class="text-slate-700"
                         >
                             {{ row.machine_name }}
                         </span>
-
                         <span
                             v-else
                             class="text-slate-400 italic text-[11px]"
                         >
                             Semua Mesin di Area
                         </span>
-
                     </template>
 
-
-                    <template #actions="{ row }">
+                    <template v-if="isAdmin" #actions="{ row }">
                         <button
                             type="button"
                             @click="openAssignModal(row)"
@@ -647,13 +637,11 @@ const submitImportForm = () => {
                         </button>
                     </template>
 
-
                     <template #empty>
                         <p>
                             Belum ada data relasi mapping ditemukan.
                         </p>
                     </template>
-
                 </DataTable>
 
             </div>
@@ -817,71 +805,48 @@ const submitImportForm = () => {
                     :columns="partsColumns"
                     :data="partNumbers"
                 >
-
                     <template #cell-pn_baan="{ value }">
-                        <span
-                            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200"
-                        >
+                        <span class="font-mono font-bold text-slate-700 whitespace-nowrap">
                             {{ value }}
                         </span>
                     </template>
 
-
                     <template #cell-description="{ value }">
                         <span
-                            class="text-slate-700 max-w-sm truncate block"
+                            class="text-slate-600 max-w-sm truncate block"
                             :title="value"
                         >
                             {{ value || '-' }}
                         </span>
                     </template>
 
-
                     <template #cell-areas_count="{ value }">
-                        <span
-                            :class="[
-                                'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border',
-                                value > 0
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                    : 'bg-slate-50 text-slate-400 border-slate-200'
-                            ]"
-                        >
-                            {{ value }} area
+                        <span class="text-slate-700">
+                            {{ value || 0 }} area
                         </span>
                     </template>
-
 
                     <template #cell-machines_count="{ value }">
-                        <span
-                            :class="[
-                                'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border',
-                                value > 0
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : 'bg-slate-50 text-slate-400 border-slate-200'
-                            ]"
-                        >
-                            {{ value }} mesin
+                        <span class="text-slate-700">
+                            {{ value || 0 }} mesin
                         </span>
                     </template>
 
-
-                    <template #actions="{ row }">
+                    <template v-if="isAdmin" #actions="{ row }">
                         <button
                             type="button"
                             @click="openAssignModal(row)"
-                            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold shadow-xs transition-colors"
+                            class="text-blue-600 hover:text-blue-900 hover:underline font-semibold inline-flex items-center gap-1 text-xs"
                         >
-                            <span>Atur Mapping</span>
+                            Atur Mapping
                         </button>
                     </template>
-
 
                     <template #empty>
                         <p>
                             Tidak ada part number ditemukan.
                         </p>
                     </template>
-
                 </DataTable>
 
             </div>

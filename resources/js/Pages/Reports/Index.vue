@@ -2,11 +2,10 @@
 import { ref, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import Pagination from '@/Components/Pagination.vue';
+import DataTable from '@/Components/Table/DataTable.vue';
 import {
     Search,
     RotateCcw,
-    Calendar,
     FileSpreadsheet,
     FileText,
 } from 'lucide-vue-next';
@@ -173,7 +172,26 @@ const exportPdf = () => {
     });
 };
 
-// Formatters
+// Table Columns & Formatters
+const tableColumns = [
+    { key: 'consumed_at', label: 'Tanggal', width: 'w-32' },
+    { key: 'part_number.pn_baan', label: 'PN BAAN', width: 'w-44' },
+    { key: 'part_number.description', label: 'Deskripsi' },
+    { key: 'area.name', label: 'Area', width: 'w-36' },
+    { key: 'machine.name', label: 'Machine', width: 'w-36' },
+    { key: 'quantity', label: 'Qty', align: 'right', width: 'w-24' },
+    { key: 'amount', label: 'Amount', align: 'right', width: 'w-36' },
+];
+
+const formatDate = (isoString) => {
+    if (!isoString) return '-';
+    return new Date(isoString).toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+};
+
 const formatRupiah = (val) => {
     if (val === null || val === undefined || val === '') return 'Rp 0';
     return new Intl.NumberFormat('id-ID', {
@@ -376,122 +394,58 @@ const formatNumber = (val) => {
             </div>
 
             <!-- 2. TABEL DATA LAPORAN -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                
-                <!-- Table Header Bar -->
-                <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-900">
-                            Daftar Transaksi Konsumsi
-                        </h3>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                            Menampilkan {{ consumptions.from || 0 }} - {{ consumptions.to || 0 }} dari {{ consumptions.total }} baris data
-                        </p>
-                    </div>
-                </div>
+            <DataTable
+                :columns="tableColumns"
+                :data="consumptions"
+            >
+                <template #cell-consumed_at="{ value }">
+                    <span class="whitespace-nowrap text-slate-700">
+                        {{ formatDate(value) }}
+                    </span>
+                </template>
 
-                <!-- Table Content -->
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th scope="col" class="px-4 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-12">
-                                    No
-                                </th>
-                                <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    Tanggal
-                                </th>
-                                <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    PN BAAN
-                                </th>
-                                <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    Deskripsi
-                                </th>
-                                <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    Area
-                                </th>
-                                <th scope="col" class="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    Machine
-                                </th>
-                                <th scope="col" class="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    Qty
-                                </th>
-                                <th scope="col" class="px-5 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    Amount
-                                </th>
-                            </tr>
-                        </thead>
+                <template #cell-part_number\.pn_baan="{ row }">
+                    <span class="font-mono font-bold text-slate-700 whitespace-nowrap">
+                        {{ row.part_number?.pn_baan || '-' }}
+                    </span>
+                </template>
 
-                        <tbody class="divide-y divide-slate-100 bg-white">
-                            <!-- Empty State -->
-                            <tr v-if="consumptions.data.length === 0">
-                                <td colspan="8" class="px-5 py-12 text-center">
-                                    <div class="flex flex-col items-center">
-                                        <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center mb-2.5">
-                                            <Calendar class="w-5 h-5 text-slate-400" />
-                                        </div>
-                                        <p class="text-xs font-semibold text-slate-700">
-                                            Tidak ada data laporan
-                                        </p>
-                                        <p class="text-[11px] text-slate-400 mt-0.5">
-                                            Tidak ada transaksi konsumsi yang memenuhi kriteria filter yang dipilih.
-                                        </p>
-                                    </div>
-                                </td>
-                            </tr>
+                <template #cell-part_number\.description="{ row }">
+                    <span class="max-w-sm truncate block text-slate-600" :title="row.part_number?.description">
+                        {{ row.part_number?.description || '-' }}
+                    </span>
+                </template>
 
-                            <!-- Data Rows -->
-                            <tr
-                                v-for="(item, index) in consumptions.data"
-                                :key="item.id"
-                                class="hover:bg-slate-50/70 transition-colors"
-                            >
-                                <td class="px-4 py-3 text-center text-xs text-slate-400">
-                                    {{ (consumptions.from || 1) + index }}
-                                </td>
+                <template #cell-area\.name="{ row }">
+                    <span v-if="row.area" class="text-slate-700">
+                        {{ row.area.name }}
+                    </span>
+                    <span v-else class="text-slate-400 italic text-[11px]">-</span>
+                </template>
 
-                                <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
-                                    {{ item.consumed_at ? new Date(item.consumed_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' }}
-                                </td>
+                <template #cell-machine\.name="{ row }">
+                    <span v-if="row.machine" class="text-slate-700">
+                        {{ row.machine.name }}
+                    </span>
+                    <span v-else class="text-slate-400 italic text-[11px]">-</span>
+                </template>
 
-                                <td class="px-4 py-3 text-xs font-mono font-bold text-blue-700 whitespace-nowrap">
-                                    {{ item.part_number?.pn_baan ?? '-' }}
-                                </td>
+                <template #cell-quantity="{ value }">
+                    <span class="font-bold text-slate-900">
+                        {{ formatNumber(value) }}
+                    </span>
+                </template>
 
-                                <td class="px-4 py-3 text-xs text-slate-700 max-w-sm truncate" :title="item.part_number?.description">
-                                    {{ item.part_number?.description ?? '-' }}
-                                </td>
+                <template #cell-amount="{ value }">
+                    <span class="font-semibold text-slate-900 whitespace-nowrap">
+                        {{ formatRupiah(value) }}
+                    </span>
+                </template>
 
-                                <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
-                                    <span v-if="item.area" class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">
-                                        {{ item.area.name }}
-                                    </span>
-                                    <span v-else class="text-slate-400">—</span>
-                                </td>
-
-                                <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
-                                    {{ item.machine?.name ?? '-' }}
-                                </td>
-
-                                <td class="px-4 py-3 text-right text-xs font-bold text-slate-900 tabular-nums">
-                                    {{ formatNumber(item.quantity) }}
-                                </td>
-
-                                <td class="px-5 py-3 text-right text-xs font-semibold text-slate-700 tabular-nums whitespace-nowrap font-mono">
-                                    {{ formatRupiah(item.amount) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Table Footer / Pagination -->
-                <div v-if="consumptions.data.length > 0" class="p-4 border-t border-slate-100 bg-slate-50/30">
-                    <Pagination :links="consumptions.links" />
-                </div>
-
-            </div>
-
+                <template #empty>
+                    <p>Tidak ada transaksi konsumsi yang memenuhi kriteria filter yang dipilih.</p>
+                </template>
+            </DataTable>
         </div>
     </AppLayout>
 </template>

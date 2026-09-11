@@ -4,7 +4,6 @@ import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTable from '@/Components/Table/DataTable.vue';
 import Modal from '@/Components/Modal.vue';
-import StatusBadge from '@/Components/UI/StatusBadge.vue';
 import ConfirmModal from '@/Components/UI/ConfirmModal.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -73,6 +72,11 @@ const formatDate = (isoString) => {
         month: 'short',
         year: 'numeric',
     });
+};
+
+const getRoleLabel = (user) => {
+    const roleName = user.roles && user.roles[0]?.name ? user.roles[0].name : (user.role || 'user');
+    return roleName.toLowerCase() === 'admin' ? 'Administrator' : 'User';
 };
 
 // ==========================================
@@ -267,24 +271,27 @@ const doDelete = () => {
                     <span class="font-medium text-slate-900">{{ value }}</span>
                     <span
                         v-if="row.id === page.props.auth?.user?.id"
-                        class="ml-2 text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold"
+                        class="ml-1.5 text-slate-400 text-xs font-normal"
                     >
-                        Anda
+                        (Anda)
                     </span>
                 </template>
 
-                <template #cell-role="{ row, value }">
-                    <StatusBadge
-                        :value="row.roles && row.roles[0]?.name ? row.roles[0].name : (value || 'user')"
-                        type="role"
-                    />
+                <template #cell-email="{ value }">
+                    <span class="text-slate-600">{{ value }}</span>
+                </template>
+
+                <template #cell-role="{ row }">
+                    <span class="text-slate-700">
+                        {{ getRoleLabel(row) }}
+                    </span>
                 </template>
 
                 <template #cell-created_at="{ value }">
                     <span class="text-slate-500 whitespace-nowrap text-xs">{{ formatDate(value) }}</span>
                 </template>
 
-                <template #actions="{ row }">
+                <template v-if="isAdmin" #actions="{ row }">
                     <button
                         type="button"
                         @click="openEditModal(row)"

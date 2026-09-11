@@ -369,7 +369,11 @@ const submitImport = () => {
                 :data="partNumbers"
             >
                 <template #cell-pn_baan="{ value }">
-                    <span class="font-mono text-xs font-bold text-blue-700">{{ value }}</span>
+                    <span class="font-mono font-bold text-slate-700 whitespace-nowrap">{{ value }}</span>
+                </template>
+
+                <template #cell-description="{ value }">
+                    <span class="text-slate-600">{{ value || '-' }}</span>
                 </template>
 
                 <template #cell-price_per_unit="{ value }">
@@ -379,18 +383,18 @@ const submitImport = () => {
                 </template>
 
                 <template #cell-areas_count="{ value }">
-                    <span class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded font-semibold">
-                        {{ value }} area
+                    <span class="text-slate-700">
+                        {{ value || 0 }} area
                     </span>
                 </template>
 
                 <template #cell-machines_count="{ value }">
-                    <span class="bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded font-semibold">
-                        {{ value }} machine
+                    <span class="text-slate-700">
+                        {{ value || 0 }} mesin
                     </span>
                 </template>
 
-                <template #actions="{ row }">
+                <template v-if="isAdmin" #actions="{ row }">
                     <button
                         type="button"
                         @click="openEditModal(row)"

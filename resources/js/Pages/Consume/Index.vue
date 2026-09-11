@@ -696,7 +696,7 @@ const saveSchedules = () => {
                 </template>
 
                 <template #cell-part_number\.pn_baan="{ row }">
-                    <span class="font-mono font-bold text-blue-700 whitespace-nowrap">
+                    <span class="font-mono font-bold text-slate-700 whitespace-nowrap">
                         {{ row.part_number?.pn_baan || '-' }}
                     </span>
                 </template>
