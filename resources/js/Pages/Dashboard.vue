@@ -819,9 +819,9 @@ const refreshData = () => {
 
 
             <!-- 3 & 4. Charts: Tren Harian (2/3) & Konsumsi per Area (1/3) -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
                 <!-- Line chart: col-span-2 (2/3 lebar) -->
-                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <h3 class="text-sm font-bold text-slate-800">
@@ -833,7 +833,7 @@ const refreshData = () => {
                         </div>
                     </div>
 
-                    <div class="h-64 w-full">
+                    <div class="flex-1 w-full min-h-[17rem] relative">
                         <Line
                             v-if="dailyTrend.length > 0"
                             :data="chartConfig.data"
@@ -853,7 +853,7 @@ const refreshData = () => {
 
                 <!-- Bar chart: col-span-1 (1/3 lebar) -->
                 <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-                    <div>
+                    <div class="flex-1 flex flex-col">
                         <div class="flex items-center justify-between mb-4">
                             <div>
                                 <h3 class="text-sm font-bold text-slate-800">Konsumsi Area</h3>
@@ -863,7 +863,7 @@ const refreshData = () => {
                             </div>
                         </div>
 
-                        <div class="h-64 w-full">
+                        <div class="flex-1 w-full min-h-[13rem] relative">
                             <Bar
                                 v-if="((areaConsumption?.fa || 0) + (areaConsumption?.smt || 0) + (areaConsumption?.common || 0)) > 0"
                                 :data="barChartConfig.data"
