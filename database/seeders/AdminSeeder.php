@@ -13,7 +13,7 @@ class AdminSeeder extends Seeder
      */
     public function run(): void
     {
-        $admin = User::firstOrCreate(
+        User::firstOrCreate(
             ['email' => 'admin@copa.local'],
             [
                 'name' => 'Administrator',
@@ -21,8 +21,5 @@ class AdminSeeder extends Seeder
                 'role' => 'admin',
             ]
         );
-
-        $admin->assignRole('admin');
     }
 }
-

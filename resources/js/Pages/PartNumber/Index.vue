@@ -13,10 +13,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Search, RotateCcw, Plus, X, Layers, Upload, Download, AlertCircle } from 'lucide-vue-next';
 
 const page = usePage();
-const isAdmin = computed(() => {
-    const user = page.props.auth?.user;
-    return user?.role === 'admin' || user?.is_admin === true;
-});
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
 
 const props = defineProps({
     partNumbers: {
@@ -65,20 +62,10 @@ const resetFilter = () => {
 const tableColumns = [
     { key: 'pn_baan', label: 'PN BAAN', width: 'w-48' },
     { key: 'description', label: 'Deskripsi' },
-    { key: 'price_per_unit', label: 'Harga/Unit', align: 'right', width: 'w-36' },
     { key: 'areas_count', label: 'Area Mapping', align: 'center', width: 'w-32' },
     { key: 'machines_count', label: 'Machine Mapping', align: 'center', width: 'w-36' },
 ];
 
-const formatRupiah = (val) => {
-    if (val === null || val === undefined || val === '') return '-';
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(Math.abs(Number(val)));
-};
 
 // ==========================================
 // 3. CREATE / EDIT MODAL FORM
@@ -90,7 +77,6 @@ const isEditing = computed(() => !!editingPart.value);
 const form = useForm({
     pn_baan: '',
     description: '',
-    price_per_unit: '',
     area_ids: [],
     machine_ids: [],
 });
@@ -109,7 +95,6 @@ const openEditModal = (part) => {
     form.clearErrors();
     form.pn_baan = part.pn_baan || '';
     form.description = part.description || '';
-    form.price_per_unit = part.price_per_unit !== null && part.price_per_unit !== undefined ? part.price_per_unit : '';
     form.area_ids = part.areas ? part.areas.map(a => a.id) : [];
     form.machine_ids = part.machines ? part.machines.map(m => m.id) : [];
     isModalOpen.value = true;
@@ -262,7 +247,7 @@ const submitImport = () => {
                     Master Data Part Number
                 </h2>
                 <p class="text-xs text-slate-500 mt-0.5">
-                    Kelola katalog nomor part (PN BAAN), harga satuan, dan relasi mapping.
+                    Kelola katalog nomor part (PN BAAN) dan relasi mapping area/mesin.
                 </p>
             </div>
         </template>
@@ -376,11 +361,6 @@ const submitImport = () => {
                     <span class="text-slate-600">{{ value || '-' }}</span>
                 </template>
 
-                <template #cell-price_per_unit="{ value }">
-                    <span class="font-semibold text-slate-900 whitespace-nowrap text-xs">
-                        {{ formatRupiah(value) }}
-                    </span>
-                </template>
 
                 <template #cell-areas_count="{ value }">
                     <span class="text-slate-700">
@@ -426,7 +406,7 @@ const submitImport = () => {
                             {{ isEditing ? 'Edit Data Part Number' : 'Tambah Part Number Baru' }}
                         </h3>
                         <p class="text-xs text-slate-500 mt-0.5">
-                            {{ isEditing ? 'Perbarui data part number, harga, serta mapping area & mesin.' : 'Masukkan nomor part baru beserta penugasan area/mesin.' }}
+                            {{ isEditing ? 'Perbarui data part number serta mapping area & mesin.' : 'Masukkan nomor part baru beserta penugasan area/mesin.' }}
                         </p>
                     </div>
                     <button @click="closeModal" class="text-slate-400 hover:text-slate-600 p-1">
@@ -435,36 +415,19 @@ const submitImport = () => {
                 </div>
 
                 <form @submit.prevent="submitForm" class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <!-- PN BAAN -->
-                        <div>
-                            <InputLabel for="pn_baan" value="Nomor Part (PN BAAN) *" />
-                            <TextInput
-                                id="pn_baan"
-                                v-model="form.pn_baan"
-                                type="text"
-                                class="mt-1 block w-full uppercase font-mono text-xs"
-                                placeholder="Contoh: SPFAMEBITHOL-2295"
-                                required
-                                autofocus
-                            />
-                            <InputError class="mt-1" :message="form.errors.pn_baan" />
-                        </div>
-
-                        <!-- Price Per Unit -->
-                        <div>
-                            <InputLabel for="price_per_unit" value="Harga Satuan (Rp)" />
-                            <TextInput
-                                id="price_per_unit"
-                                v-model="form.price_per_unit"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                class="mt-1 block w-full text-xs"
-                                placeholder="Contoh: 3100000"
-                            />
-                            <InputError class="mt-1" :message="form.errors.price_per_unit" />
-                        </div>
+                    <!-- PN BAAN -->
+                    <div>
+                        <InputLabel for="pn_baan" value="Nomor Part (PN BAAN) *" />
+                        <TextInput
+                            id="pn_baan"
+                            v-model="form.pn_baan"
+                            type="text"
+                            class="mt-1 block w-full uppercase font-mono text-xs"
+                            placeholder="Contoh: SPFAMEBITHOL-2295"
+                            required
+                            autofocus
+                        />
+                        <InputError class="mt-1" :message="form.errors.pn_baan" />
                     </div>
 
                     <!-- Description -->

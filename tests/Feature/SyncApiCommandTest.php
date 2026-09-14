@@ -15,7 +15,7 @@ class SyncApiCommandTest extends TestCase
 {
     public function test_artisan_command_sync_api_runs_successfully(): void
     {
-        $this->artisan('sicap:sync-api')
+        $this->artisan('copa:sync-api')
             ->assertExitCode(0);
     }
 
@@ -26,7 +26,6 @@ class SyncApiCommandTest extends TestCase
             $part = PartNumber::create([
                 'pn_baan' => 'TEST-PN-001',
                 'description' => 'Test Part',
-                'price_per_unit' => 50000,
             ]);
         }
 

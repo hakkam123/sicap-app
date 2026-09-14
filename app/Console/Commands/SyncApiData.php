@@ -13,14 +13,14 @@ class SyncApiData extends Command
      *
      * @var string
      */
-    protected $signature = 'sicap:sync-api';
+    protected $signature = 'copa:sync-api';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Synchronize consume data from external API into SICAP database';
+    protected $description = 'Synchronize consume data from external API into COPA database';
 
     /**
      * Execute the console command.
@@ -30,7 +30,7 @@ class SyncApiData extends Command
         $startTime = now();
 
         $this->info('====================================================');
-        $this->info(" SICAP API Synchronization");
+        $this->info(" COPA API Synchronization");
         $this->info(" Started at: {$startTime->toDateTimeString()}");
         $this->info('====================================================');
 
@@ -56,7 +56,7 @@ class SyncApiData extends Command
         } catch (\Throwable $e) {
             $this->error("❌ Synchronization failed: " . $e->getMessage());
 
-            Log::error("Artisan Command [sicap:sync-api] Exception: " . $e->getMessage(), [
+            Log::error("Artisan Command [copa:sync-api] Exception: " . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),

@@ -16,6 +16,22 @@ class ConsumeApiController extends Controller
      */
     public function sync(ConsumeApiRequest $request, ConsumeSyncService $syncService): JsonResponse
     {
+        $user = $request->user();
+
+        // Enforce token scope/ability check
+        if ($user && method_exists($user, 'tokenCan') && ! $user->tokenCan('consumes:sync')) {
+            Log::channel('security')->warning('API Sync Attempt with Insufficient Token Abilities', [
+                'user_id' => $user->id,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Token tidak memiliki hak akses (ability) [consumes:sync].',
+            ], 403);
+        }
+
         $items = $request->input('consumes');
         $userId = Auth::id();
 

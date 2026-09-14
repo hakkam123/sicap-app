@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTable from '@/Components/Table/DataTable.vue';
-import StatusBadge from '@/Components/UI/StatusBadge.vue';
 import ConfirmModal from '@/Components/UI/ConfirmModal.vue';
 import Modal from '@/Components/Modal.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -46,10 +45,6 @@ const props = defineProps({
             per_page: 10,
         }),
     },
-    importLogs: {
-        type: Array,
-        default: () => [],
-    },
     partNumbers: {
         type: Array,
         default: () => [],
@@ -65,10 +60,7 @@ const props = defineProps({
 });
 
 const page = usePage();
-const isAdmin = computed(() => {
-    const user = page.props.auth?.user;
-    return user?.role === 'admin' || user?.is_admin === true;
-});
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
 
 // ==========================================
 // 1. FILTER STATE & ACTIONS
@@ -178,15 +170,6 @@ const formatDate = (isoString) => {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
-    });
-};
-
-const formatDateTime = (isoString) => {
-    if (!isoString) return '-';
-    const d = new Date(isoString);
-    return d.toLocaleString('id-ID', {
-        dateStyle: 'short',
-        timeStyle: 'short',
     });
 };
 
@@ -711,12 +694,18 @@ const saveSchedules = () => {
                     <span v-if="row.area" class="font-medium text-slate-800">
                         {{ row.area.name }}
                     </span>
+                    <span v-else-if="row.part_number?.areas && row.part_number.areas.length > 0" class="font-medium text-slate-800" :title="row.part_number.areas.map(a => `${a.name} (${a.code})`).join(', ')">
+                        {{ row.part_number.areas.map(a => a.name).join(', ') }}
+                    </span>
                     <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>
 
                 <template #cell-machine\.name="{ row }">
                     <span v-if="row.machine" class="font-medium text-slate-800">
                         {{ row.machine.name }}
+                    </span>
+                    <span v-else-if="row.part_number?.machines && row.part_number.machines.length > 0" class="font-medium text-slate-800" :title="row.part_number.machines.map(m => `${m.name} (${m.code})`).join(', ')">
+                        {{ row.part_number.machines.map(m => m.name).join(', ') }}
                     </span>
                     <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>
@@ -971,29 +960,6 @@ const saveSchedules = () => {
                         </button>
                     </div>
                 </form>
-
-                <!-- Riwayat Import Terakhir -->
-                <div v-if="importLogs.length > 0" class="pt-4 border-t border-slate-100 space-y-3">
-                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                        Riwayat Import Terakhir
-                    </h4>
-                    <div class="max-h-48 overflow-y-auto space-y-2 pr-1">
-                        <div
-                            v-for="log in importLogs"
-                            :key="log.id"
-                            class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs flex items-center justify-between"
-                        >
-                            <div>
-                                <p class="font-bold text-slate-800 font-mono text-[11px]">{{ log.file_name }}</p>
-                                <p class="text-[10px] text-slate-400">{{ formatDateTime(log.created_at) }}</p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <StatusBadge :value="log.status" type="status" />
-                                <span class="text-[11px] font-bold text-slate-700">{{ log.processed_rows || 0 }}/{{ log.total_rows || 0 }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </Modal>
 

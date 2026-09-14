@@ -12,11 +12,7 @@ import { Search, RotateCcw, Download, Upload, AlertCircle, X } from 'lucide-vue-
 
 const page = usePage();
 
-const isAdmin = computed(() => {
-    const user = page.props.auth?.user;
-
-    return user?.role === 'admin' || user?.is_admin === true;
-});
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
 
 const props = defineProps({
     partNumbers: {
@@ -1258,8 +1254,7 @@ const submitImportForm = () => {
                             :disabled="!importFile || isUploading"
                             class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <Upload class="w-3.5 h-3.5" />
-                            <span>{{ isUploading ? 'Mengimpor...' : 'Import Data' }}</span>
+                            <span>{{ isUploading ? 'Mengimpor...' : 'Import' }}</span>
                         </button>
                     </div>
                 </form>

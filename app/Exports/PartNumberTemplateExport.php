@@ -16,7 +16,6 @@ class PartNumberTemplateExport implements FromArray, WithHeadings, ShouldAutoSiz
         return [
             'pn_baan',
             'description',
-            'price_per_unit',
         ];
     }
 
@@ -29,14 +28,11 @@ class PartNumberTemplateExport implements FromArray, WithHeadings, ShouldAutoSiz
             [
                 'PN-001',
                 'Bearing 6205',
-                45000,
             ],
             [
                 'PN-002',
                 'Solenoid Valve 24V',
-                125000,
             ],
         ];
     }
 }
-

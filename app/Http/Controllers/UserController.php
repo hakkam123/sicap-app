@@ -18,7 +18,7 @@ class UserController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = User::query()->with('roles:id,name')->latest();
+        $query = User::query()->latest();
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -50,8 +50,6 @@ class UserController extends Controller
             'role' => $request->role,
         ]);
 
-        $user->assignRole($request->role);
-
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan');
     }
 
@@ -71,7 +69,6 @@ class UserController extends Controller
         }
 
         $user->update($data);
-        $user->syncRoles([$request->role]);
 
         return redirect()->route('users.index')->with('success', 'User berhasil diperbarui');
     }

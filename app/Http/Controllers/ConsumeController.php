@@ -8,7 +8,6 @@ use App\Http\Requests\ConsumeRequest;
 use App\Imports\ConsumeImport;
 use App\Models\Area;
 use App\Models\Consume;
-use App\Models\ImportLog;
 use App\Models\Machine;
 use App\Models\PartNumber;
 use App\Models\SyncSchedule;
@@ -33,6 +32,8 @@ class ConsumeController extends Controller
     {
         $query = Consume::with([
             'partNumber:id,pn_baan,description',
+            'partNumber.areas:id,code,name',
+            'partNumber.machines:id,code,name',
             'area:id,code,name',
             'machine:id,code,name',
             'creator:id,name',
@@ -68,7 +69,6 @@ class ConsumeController extends Controller
         $consumes = $query->orderBy('consumed_at', 'DESC')->paginate((int) $request->input('per_page', 10))->withQueryString();
 
         $areas = Area::select('id', 'code', 'name')->whereNull('deleted_at')->orderBy('name')->get();
-        $importLogs = ImportLog::with('user:id,name')->orderBy('created_at', 'DESC')->limit(10)->get();
         $partNumbers = PartNumber::select('id', 'pn_baan', 'description')
             ->whereNull('deleted_at')
             ->orderBy('pn_baan')
@@ -88,7 +88,6 @@ class ConsumeController extends Controller
             'consumes' => $consumes,
             'areas' => $areas,
             'filters' => array_merge($request->only(['search', 'area_id', 'machine_id', 'date_from', 'date_to']), ['per_page' => (int) $request->input('per_page', 10)]),
-            'importLogs' => $importLogs,
             'partNumbers' => $partNumbers,
             'lastSyncAt' => $lastSyncFormatted,
             'syncSchedules' => $syncSchedules,

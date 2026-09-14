@@ -147,7 +147,7 @@ class ConsumeSyncService
             ->values()
             ->all();
 
-        $partMap = PartNumber::whereIn('pn_baan', $pnCodes)->get()->keyBy('pn_baan');
+        $partMap = PartNumber::with(['areas', 'machines'])->whereIn('pn_baan', $pnCodes)->get()->keyBy('pn_baan');
         $areaMap = !empty($areaCodes) ? Area::whereIn('code', $areaCodes)->get()->keyBy('code') : collect();
         $machineMap = !empty($machineCodes) ? Machine::whereIn('code', $machineCodes)->get()->keyBy('code') : collect();
 
@@ -263,11 +263,14 @@ class ConsumeSyncService
                 continue;
             }
 
+            $finalAreaId = $area?->id ?? $machine?->area_id ?? $part->areas->first()?->id ?? null;
+            $finalMachineId = $machine?->id ?? $part->machines->first()?->id ?? null;
+
             $recordsToInsert[] = [
                 'id' => (string) Str::ulid(),
                 'part_number_id' => $part->id,
-                'area_id' => $area?->id ?? $machine?->area_id ?? null,
-                'machine_id' => $machine?->id ?? null,
+                'area_id' => $finalAreaId,
+                'machine_id' => $finalMachineId,
                 'quantity' => $quantity,
                 'amount' => $amount,
                 'consumed_at' => $consumedAt,

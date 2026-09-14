@@ -19,15 +19,7 @@ class PartNumber extends Model
     protected $fillable = [
         'pn_baan',
         'description',
-        'price_per_unit',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'price_per_unit' => 'decimal:2',
-        ];
-    }
 
     public function areas(): BelongsToMany
     {
@@ -44,4 +36,3 @@ class PartNumber extends Model
         return $this->hasMany(Consume::class);
     }
 }
-

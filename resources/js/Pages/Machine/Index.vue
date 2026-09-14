@@ -13,10 +13,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Search, RotateCcw, Plus, X, Upload, Download, AlertCircle } from 'lucide-vue-next';
 
 const page = usePage();
-const isAdmin = computed(() => {
-    const user = page.props.auth?.user;
-    return user?.role === 'admin' || user?.is_admin === true;
-});
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
 
 const props = defineProps({
     machines: {

@@ -180,7 +180,6 @@ class MasterDataSeeder extends Seeder
                 'id'             => $id,
                 'pn_baan'        => $pnBaan,
                 'description'    => $desc ?: null,
-                'price_per_unit' => null,
                 'deleted_at'     => null,
                 'created_at'     => now(),
                 'updated_at'     => now(),

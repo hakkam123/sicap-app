@@ -24,7 +24,9 @@ class ConsumeExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
     public function query(): Builder
     {
         $query = Consume::query()->with([
-            'partNumber:id,pn_baan,description,price_per_unit',
+            'partNumber:id,pn_baan,description',
+            'partNumber.areas:id,code,name',
+            'partNumber.machines:id,code,name',
             'area:id,code,name',
             'machine:id,code,name',
             'creator:id,name',
@@ -86,13 +88,19 @@ class ConsumeExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
             default        => 'Manual',
         };
 
+        $areaName = $consume->area?->name
+            ?? ($consume->partNumber?->areas->isNotEmpty() ? $consume->partNumber->areas->pluck('name')->join(', ') : 'Tidak Diketahui');
+
+        $machineName = $consume->machine?->name
+            ?? ($consume->partNumber?->machines->isNotEmpty() ? $consume->partNumber->machines->pluck('name')->join(', ') : '-');
+
         return [
             $this->rowNumber,
             $consume->consumed_at ? $consume->consumed_at->format('d/m/Y') : '-',
             $consume->partNumber?->pn_baan ?? '-',
             $consume->partNumber?->description ?? '-',
-            $consume->area?->name ?? 'Tidak Diketahui',
-            $consume->machine?->name ?? '-',
+            $areaName,
+            $machineName,
             abs($consume->quantity),
             abs($consume->amount ?? 0),
             $sourceLabel,

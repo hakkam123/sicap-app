@@ -49,7 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
 });
 
-Route::middleware(['auth', 'role:admin'])->group(function () {
+Route::middleware(['auth', 'admin'])->group(function () {
     // Area Routes & Import/Template
     Route::post('/areas/import', [AreaController::class, 'import'])->name('areas.import');
     Route::get('/areas/template', [AreaController::class, 'downloadTemplate'])->name('areas.template');

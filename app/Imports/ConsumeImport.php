@@ -61,7 +61,7 @@ class ConsumeImport implements ToArray, WithHeadingRow
                     continue;
                 }
 
-                $partNumber = PartNumber::where('pn_baan', $pnBaan)->first();
+                $partNumber = PartNumber::with(['areas', 'machines'])->where('pn_baan', $pnBaan)->first();
                 if (!$partNumber) {
                     $this->errorCount++;
                     $this->errors[] = [
@@ -132,12 +132,16 @@ class ConsumeImport implements ToArray, WithHeadingRow
                     continue;
                 }
 
-                // Simpan transaksi consume (area_id & machine_id bernilai null sesuai format baru)
+                // Ambil area dan mesin otomatis dari relasi mapping part_number jika tersedia
+                $mappedAreaId = $partNumber->areas->first()?->id;
+                $mappedMachineId = $partNumber->machines->first()?->id;
+
+                // Simpan transaksi consume dengan area & machine dari mapping
                 Consume::create([
                     'id' => (string) Str::ulid(),
                     'part_number_id' => $partNumber->id,
-                    'area_id' => null,
-                    'machine_id' => null,
+                    'area_id' => $mappedAreaId,
+                    'machine_id' => $mappedMachineId,
                     'quantity' => $qty,
                     'amount' => $amount,
                     'consumed_at' => $consumedAt,

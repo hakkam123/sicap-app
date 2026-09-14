@@ -32,7 +32,6 @@ class PartNumberRequest extends FormRequest
                 Rule::unique('part_numbers', 'pn_baan')->ignore($partNumber),
             ],
             'description' => ['nullable', 'string'],
-            'price_per_unit' => ['nullable', 'numeric', 'min:0'],
             'area_ids' => ['nullable', 'array'],
             'area_ids.*' => ['string', 'exists:areas,id'],
             'machine_ids' => ['nullable', 'array'],
@@ -51,8 +50,6 @@ class PartNumberRequest extends FormRequest
             'pn_baan.required' => 'Nomor part (PN BAAN) wajib diisi.',
             'pn_baan.unique' => 'Nomor part (PN BAAN) sudah terdaftar.',
             'pn_baan.max' => 'Nomor part maksimal 100 karakter.',
-            'price_per_unit.numeric' => 'Harga satuan harus berupa angka.',
-            'price_per_unit.min' => 'Harga satuan tidak boleh kurang dari 0.',
         ];
     }
 }

@@ -9,13 +9,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/consumes/sync', [ConsumeApiController::class, 'sync'])
         ->middleware('throttle:api-consume-sync');
 
-    // Endpoint generate token API dengan perlindungan rate limiter
     Route::post('/tokens/create', function (Request $request) {
-        $tokenName = $request->input('token_name', 'api-token');
-        $token = $request->user()->createToken($tokenName);
+        $tokenName = $request->input('token_name', 'api-sync-token');
+        $abilities = (array) $request->input('abilities', ['consumes:sync']);
+        $token = $request->user()->createToken($tokenName, $abilities);
 
         return response()->json([
+            'status' => 'success',
             'token' => $token->plainTextToken,
+            'abilities' => $abilities,
         ]);
     })->middleware('throttle:api-token-create');
 });

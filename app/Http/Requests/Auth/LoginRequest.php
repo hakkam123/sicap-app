@@ -45,6 +45,12 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            \Illuminate\Support\Facades\Log::channel('security')->warning('Failed Login Attempt', [
+                'email' => $this->input('email'),
+                'ip' => $this->ip(),
+                'user_agent' => $this->userAgent(),
+            ]);
+
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
             ]);
@@ -63,6 +69,12 @@ class LoginRequest extends FormRequest
         if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
             return;
         }
+
+        \Illuminate\Support\Facades\Log::channel('security')->alert('Login Rate Limit Exceeded (Lockout Triggered)', [
+            'email' => $this->input('email'),
+            'ip' => $this->ip(),
+            'user_agent' => $this->userAgent(),
+        ]);
 
         event(new Lockout($this));
 

@@ -13,10 +13,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Search, RotateCcw, Plus, X } from 'lucide-vue-next';
 
 const page = usePage();
-const isAdmin = computed(() => {
-    const user = page.props.auth?.user;
-    return user?.role === 'admin' || user?.is_admin === true;
-});
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
 
 const props = defineProps({
     users: {
@@ -75,8 +72,7 @@ const formatDate = (isoString) => {
 };
 
 const getRoleLabel = (user) => {
-    const roleName = user.roles && user.roles[0]?.name ? user.roles[0].name : (user.role || 'user');
-    return roleName.toLowerCase() === 'admin' ? 'Administrator' : 'User';
+    return user.role === 'admin' ? 'Administrator' : 'User';
 };
 
 // ==========================================
@@ -107,7 +103,7 @@ const openEditModal = (user) => {
     form.clearErrors();
     form.name = user.name || '';
     form.email = user.email || '';
-    form.role = user.roles && user.roles.length > 0 ? user.roles[0].name : (user.role || 'user');
+    form.role = user.role || 'user';
     form.password = '';
     form.password_confirmation = '';
     isModalOpen.value = true;
@@ -356,7 +352,7 @@ const doDelete = () => {
                             v-model="form.email"
                             type="email"
                             class="mt-1 block w-full text-xs"
-                            placeholder="contoh: operator@sicap.local"
+                            placeholder="contoh: operator@copa.local"
                             required
                         />
                         <InputError class="mt-1" :message="form.errors.email" />

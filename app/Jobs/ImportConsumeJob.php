@@ -94,7 +94,7 @@ class ImportConsumeJob implements ShouldQueue
 
                     // Look up Part Number
                     if (!isset($partCache[$pnBaan])) {
-                        $partCache[$pnBaan] = PartNumber::where('pn_baan', $pnBaan)->first();
+                        $partCache[$pnBaan] = PartNumber::with(['areas', 'machines'])->where('pn_baan', $pnBaan)->first();
                     }
                     $part = $partCache[$pnBaan];
 
@@ -131,10 +131,13 @@ class ImportConsumeJob implements ShouldQueue
                         continue;
                     }
 
+                    $mappedAreaId = $part->areas->first()?->id;
+                    $mappedMachineId = $part->machines->first()?->id;
+
                     Consume::create([
                         'part_number_id' => $part->id,
-                        'area_id' => null,
-                        'machine_id' => null,
+                        'area_id' => $mappedAreaId,
+                        'machine_id' => $mappedMachineId,
                         'quantity' => $quantity,
                         'amount' => $amount,
                         'consumed_at' => $consumedAt,
