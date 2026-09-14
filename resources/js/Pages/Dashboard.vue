@@ -1113,9 +1113,9 @@ const refreshData = () => {
                                     </span>
                                 </td>
 
-                                <!-- PN (Badge Mono) -->
+                                <!-- PN -->
                                 <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80">
+                                    <span class="font-mono text-xs font-semibold text-slate-800">
                                         {{ item.pn_baan }}
                                     </span>
                                 </td>
