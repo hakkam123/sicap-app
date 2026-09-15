@@ -27,8 +27,12 @@ class ReportExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSi
     {
         $query = Consume::query()->with([
             'partNumber:id,pn_baan,description',
+            'partNumber.areas:id,code,name',
+            'partNumber.machines:id,area_id,code,name',
+            'partNumber.machines.area:id,code,name',
             'area:id,code,name',
-            'machine:id,code,name',
+            'machine:id,area_id,code,name',
+            'machine.area:id,code,name',
         ]);
 
         if (!empty($this->filters['search'])) {
@@ -40,7 +44,23 @@ class ReportExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSi
         }
 
         if (!empty($this->filters['area_id'])) {
-            $query->where('area_id', $this->filters['area_id']);
+            if ($this->filters['area_id'] === 'common') {
+                $query->whereHas('partNumber', function ($pnQuery) {
+                    $pnQuery->whereHas('areas', fn($a) => $a->where('code', 'FA'))
+                            ->whereHas('areas', fn($a) => $a->where('code', 'SMT'));
+                });
+            } else {
+                $areaId = $this->filters['area_id'];
+                $query->where(function ($sub) use ($areaId) {
+                    $sub->where('consumes.area_id', $areaId)
+                        ->orWhereExists(function ($ex) use ($areaId) {
+                            $ex->select(\Illuminate\Support\Facades\DB::raw(1))
+                               ->from('area_part_number')
+                               ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
+                               ->where('area_part_number.area_id', $areaId);
+                        });
+                });
+            }
         }
 
         if (!empty($this->filters['machine_id'])) {
@@ -82,8 +102,8 @@ class ReportExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSi
             $this->rowNumber,
             $consume->partNumber?->pn_baan ?? '-',
             $consume->partNumber?->description ?? '-',
-            $consume->area?->name ?? 'Tidak Diketahui',
-            $consume->machine?->name ?? '-',
+            $consume->display_area,
+            $consume->display_machine,
             abs($consume->quantity),
             (float) abs($consume->amount ?? 0),
         ];

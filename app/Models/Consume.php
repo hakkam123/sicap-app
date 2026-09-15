@@ -25,6 +25,11 @@ class Consume extends Model
         'created_by',
     ];
 
+    protected $appends = [
+        'display_area',
+        'display_machine',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -52,6 +57,57 @@ class Consume extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by')->withTrashed();
+    }
+
+    /**
+     * Get the dynamic display area name (Common if FA & SMT mapped, or specific area names).
+     */
+    public function getDisplayAreaAttribute(): string
+    {
+        $partNumber = $this->partNumber;
+        if ($partNumber && $partNumber->relationLoaded('areas') && $partNumber->areas->isNotEmpty()) {
+            $codes = $partNumber->areas->pluck('code')->map(fn($c) => strtoupper(trim($c)))->all();
+            $hasFa = in_array('FA', $codes);
+            $hasSmt = in_array('SMT', $codes);
+
+            if ($hasFa && $hasSmt) {
+                return 'Common (FA & SMT)';
+            }
+
+            if (count($partNumber->areas) === 1) {
+                return $partNumber->areas->first()->name;
+            }
+
+            return $partNumber->areas->pluck('name')->join(', ');
+        }
+
+        return $this->area?->name ?? '-';
+    }
+
+    /**
+     * Get the dynamic display machines list (e.g., "Machine 1 (FA), Machine 2 (SMT)").
+     */
+    public function getDisplayMachineAttribute(): string
+    {
+        $partNumber = $this->partNumber;
+        if ($partNumber && $partNumber->relationLoaded('machines') && $partNumber->machines->isNotEmpty()) {
+            $machines = $partNumber->machines->map(function ($m) {
+                $areaCode = $m->area?->code;
+                if (!$areaCode && $m->area_id) {
+                    $areaCode = Area::find($m->area_id)?->code;
+                }
+                return $areaCode ? "{$m->name} ({$areaCode})" : $m->name;
+            })->unique()->values();
+
+            return $machines->isNotEmpty() ? $machines->join(', ') : '-';
+        }
+
+        if ($this->machine) {
+            $areaCode = $this->machine->area?->code;
+            return $areaCode ? "{$this->machine->name} ({$areaCode})" : $this->machine->name;
+        }
+
+        return '-';
     }
 }
 

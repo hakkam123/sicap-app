@@ -145,10 +145,10 @@ const reloadData = () => {
 // ==========================================
 const tableColumns = [
     { key: 'consumed_at', label: 'TANGGAL' },
-    { key: 'part_number.pn_baan', label: 'PN BAAN' },
-    { key: 'part_number.description', label: 'DESKRIPSI' },
-    { key: 'area.name', label: 'AREA' },
-    { key: 'machine.name', label: 'MACHINE' },
+    { key: 'pn_baan', label: 'PN BAAN' },
+    { key: 'description', label: 'DESKRIPSI' },
+    { key: 'display_area', label: 'AREA' },
+    { key: 'display_machine', label: 'MACHINE' },
     { key: 'quantity', label: 'QTY' },
     { key: 'amount', label: 'AMOUNT' },
 ];
@@ -563,6 +563,7 @@ const saveSchedules = () => {
                             class="px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 min-w-28"
                         >
                             <option value="">-- Semua Area --</option>
+                            <option value="common">Common (FA & SMT)</option>
 
                             <option
                                 v-for="area in areas"
@@ -673,41 +674,33 @@ const saveSchedules = () => {
                 :data="consumes"
             >
                 <template #cell-consumed_at="{ value }">
-                    <span class="whitespace-nowrap font-medium text-slate-700">
+                    <span class="whitespace-nowrap text-slate-700">
                         {{ formatDate(value) }}
                     </span>
                 </template>
 
-                <template #cell-part_number\.pn_baan="{ row }">
+                <template #cell-pn_baan="{ row }">
                     <span class="font-mono font-bold text-slate-700 whitespace-nowrap">
                         {{ row.part_number?.pn_baan || '-' }}
                     </span>
                 </template>
 
-                <template #cell-part_number\.description="{ row }">
+                <template #cell-description="{ row }">
                     <span class="max-w-xs truncate block text-slate-600" :title="row.part_number?.description">
                         {{ row.part_number?.description || '-' }}
                     </span>
                 </template>
 
-                <template #cell-area\.name="{ row }">
-                    <span v-if="row.area" class="font-medium text-slate-800">
-                        {{ row.area.name }}
+                <template #cell-display_area="{ row }">
+                    <span class="font-medium text-slate-800">
+                        {{ row.display_area || row.area?.name || '-' }}
                     </span>
-                    <span v-else-if="row.part_number?.areas && row.part_number.areas.length > 0" class="font-medium text-slate-800" :title="row.part_number.areas.map(a => `${a.name} (${a.code})`).join(', ')">
-                        {{ row.part_number.areas.map(a => a.name).join(', ') }}
-                    </span>
-                    <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>
 
-                <template #cell-machine\.name="{ row }">
-                    <span v-if="row.machine" class="font-medium text-slate-800">
-                        {{ row.machine.name }}
+                <template #cell-display_machine="{ row }">
+                    <span class="font-medium text-slate-800">
+                        {{ row.display_machine || row.machine?.name || '-' }}
                     </span>
-                    <span v-else-if="row.part_number?.machines && row.part_number.machines.length > 0" class="font-medium text-slate-800" :title="row.part_number.machines.map(m => `${m.name} (${m.code})`).join(', ')">
-                        {{ row.part_number.machines.map(m => m.name).join(', ') }}
-                    </span>
-                    <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>
 
                 <template #cell-quantity="{ value }">

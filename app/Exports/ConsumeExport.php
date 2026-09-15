@@ -26,9 +26,11 @@ class ConsumeExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
         $query = Consume::query()->with([
             'partNumber:id,pn_baan,description',
             'partNumber.areas:id,code,name',
-            'partNumber.machines:id,code,name',
+            'partNumber.machines:id,area_id,code,name',
+            'partNumber.machines.area:id,code,name',
             'area:id,code,name',
-            'machine:id,code,name',
+            'machine:id,area_id,code,name',
+            'machine.area:id,code,name',
             'creator:id,name',
         ]);
 
@@ -41,7 +43,23 @@ class ConsumeExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
         }
 
         if (!empty($this->filters['area_id'])) {
-            $query->where('area_id', $this->filters['area_id']);
+            if ($this->filters['area_id'] === 'common') {
+                $query->whereHas('partNumber', function ($pnQuery) {
+                    $pnQuery->whereHas('areas', fn($a) => $a->where('code', 'FA'))
+                            ->whereHas('areas', fn($a) => $a->where('code', 'SMT'));
+                });
+            } else {
+                $areaId = $this->filters['area_id'];
+                $query->where(function ($sub) use ($areaId) {
+                    $sub->where('consumes.area_id', $areaId)
+                        ->orWhereExists(function ($ex) use ($areaId) {
+                            $ex->select(\Illuminate\Support\Facades\DB::raw(1))
+                               ->from('area_part_number')
+                               ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
+                               ->where('area_part_number.area_id', $areaId);
+                        });
+                });
+            }
         }
 
         if (!empty($this->filters['machine_id'])) {
@@ -88,19 +106,13 @@ class ConsumeExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
             default        => 'Manual',
         };
 
-        $areaName = $consume->area?->name
-            ?? ($consume->partNumber?->areas->isNotEmpty() ? $consume->partNumber->areas->pluck('name')->join(', ') : 'Tidak Diketahui');
-
-        $machineName = $consume->machine?->name
-            ?? ($consume->partNumber?->machines->isNotEmpty() ? $consume->partNumber->machines->pluck('name')->join(', ') : '-');
-
         return [
             $this->rowNumber,
             $consume->consumed_at ? $consume->consumed_at->format('d/m/Y') : '-',
             $consume->partNumber?->pn_baan ?? '-',
             $consume->partNumber?->description ?? '-',
-            $areaName,
-            $machineName,
+            $consume->display_area,
+            $consume->display_machine,
             abs($consume->quantity),
             abs($consume->amount ?? 0),
             $sourceLabel,

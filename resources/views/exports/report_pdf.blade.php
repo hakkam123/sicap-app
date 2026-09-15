@@ -159,8 +159,8 @@
                 <td class="text-center">{{ $item->consumed_at ? $item->consumed_at->format('d/m/Y') : '-' }}</td>
                 <td class="font-mono font-bold">{{ $item->partNumber?->pn_baan ?? '-' }}</td>
                 <td>{{ $item->partNumber?->description ?? '-' }}</td>
-                <td>{{ $item->area?->name ?? 'Tidak Diketahui' }}</td>
-                <td>{{ $item->machine?->name ?? '-' }}</td>
+                <td>{{ $item->display_area }}</td>
+                <td>{{ $item->display_machine }}</td>
                 <td class="text-right font-bold">{{ number_format(abs($item->quantity), 0, ',', '.') }}</td>
                 <td class="text-right font-mono">Rp {{ number_format(abs($item->amount ?? 0), 0, ',', '.') }}</td>
             </tr>

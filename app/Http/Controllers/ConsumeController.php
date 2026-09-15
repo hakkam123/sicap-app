@@ -33,9 +33,11 @@ class ConsumeController extends Controller
         $query = Consume::with([
             'partNumber:id,pn_baan,description',
             'partNumber.areas:id,code,name',
-            'partNumber.machines:id,code,name',
+            'partNumber.machines:id,area_id,code,name',
+            'partNumber.machines.area:id,code,name',
             'area:id,code,name',
-            'machine:id,code,name',
+            'machine:id,area_id,code,name',
+            'machine.area:id,code,name',
             'creator:id,name',
         ]);
 
@@ -49,7 +51,22 @@ class ConsumeController extends Controller
 
         // 2. Area Filter
         if ($areaId = $request->input('area_id')) {
-            $query->where('area_id', $areaId);
+            if ($areaId === 'common') {
+                $query->whereHas('partNumber', function ($pnQuery) {
+                    $pnQuery->whereHas('areas', fn($a) => $a->where('code', 'FA'))
+                            ->whereHas('areas', fn($a) => $a->where('code', 'SMT'));
+                });
+            } else {
+                $query->where(function ($sub) use ($areaId) {
+                    $sub->where('consumes.area_id', $areaId)
+                        ->orWhereExists(function ($ex) use ($areaId) {
+                            $ex->select(DB::raw(1))
+                               ->from('area_part_number')
+                               ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
+                               ->where('area_part_number.area_id', $areaId);
+                        });
+                });
+            }
         }
 
         // 3. Machine Filter
@@ -99,10 +116,22 @@ class ConsumeController extends Controller
      */
     public function getMachinesByArea(Request $request): JsonResponse
     {
-        $machines = Machine::where('area_id', $request->area_id)
-            ->whereNull('deleted_at')
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
+        $areaId = $request->area_id;
+        if ($areaId === 'common') {
+            $machines = Machine::with('area:id,code,name')
+                ->whereHas('area', function ($q) {
+                    $q->whereIn('code', ['FA', 'SMT']);
+                })
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->get(['id', 'area_id', 'code', 'name']);
+        } else {
+            $machines = Machine::with('area:id,code,name')
+                ->where('area_id', $areaId)
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->get(['id', 'area_id', 'code', 'name']);
+        }
 
         return response()->json($machines);
     }

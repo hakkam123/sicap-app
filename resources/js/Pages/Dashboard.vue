@@ -621,6 +621,7 @@ const refreshData = () => {
                             class="w-full py-2 px-3 border border-slate-300 bg-white rounded-lg text-xs focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">-- Semua Area --</option>
+                            <option value="common">Common (FA & SMT)</option>
                             <option v-for="area in areas" :key="area.id" :value="area.id">
                                 {{ area.name }} ({{ area.code }})
                             </option>

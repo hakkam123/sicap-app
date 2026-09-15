@@ -175,10 +175,10 @@ const exportPdf = () => {
 // Table Columns & Formatters
 const tableColumns = [
     { key: 'consumed_at', label: 'Tanggal', width: 'w-32' },
-    { key: 'part_number.pn_baan', label: 'PN BAAN', width: 'w-44' },
-    { key: 'part_number.description', label: 'Deskripsi' },
-    { key: 'area.name', label: 'Area', width: 'w-36' },
-    { key: 'machine.name', label: 'Machine', width: 'w-36' },
+    { key: 'pn_baan', label: 'PN BAAN', width: 'w-44' },
+    { key: 'description', label: 'Deskripsi' },
+    { key: 'display_area', label: 'Area', width: 'w-40' },
+    { key: 'display_machine', label: 'Machine', width: 'w-64' },
     { key: 'quantity', label: 'Qty', align: 'right', width: 'w-24' },
     { key: 'amount', label: 'Amount', align: 'right', width: 'w-36' },
 ];
@@ -297,6 +297,7 @@ const formatNumber = (val) => {
                             class="w-full py-2 px-3 border border-slate-300 bg-white rounded-lg text-xs focus:ring-slate-900 focus:border-slate-900"
                         >
                             <option value="">-- Semua Area --</option>
+                            <option value="common">Common (FA & SMT)</option>
                             <option v-for="area in areas" :key="area.id" :value="area.id">
                                 {{ area.name }} ({{ area.code }})
                             </option>
@@ -404,30 +405,28 @@ const formatNumber = (val) => {
                     </span>
                 </template>
 
-                <template #cell-part_number\.pn_baan="{ row }">
+                <template #cell-pn_baan="{ row }">
                     <span class="font-mono font-bold text-slate-700 whitespace-nowrap">
                         {{ row.part_number?.pn_baan || '-' }}
                     </span>
                 </template>
 
-                <template #cell-part_number\.description="{ row }">
+                <template #cell-description="{ row }">
                     <span class="max-w-sm truncate block text-slate-600" :title="row.part_number?.description">
                         {{ row.part_number?.description || '-' }}
                     </span>
                 </template>
 
-                <template #cell-area\.name="{ row }">
-                    <span v-if="row.area" class="text-slate-700">
-                        {{ row.area.name }}
+                <template #cell-display_area="{ row }">
+                    <span class="text-slate-700 font-medium">
+                        {{ row.display_area || row.area?.name || '-' }}
                     </span>
-                    <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>
 
-                <template #cell-machine\.name="{ row }">
-                    <span v-if="row.machine" class="text-slate-700">
-                        {{ row.machine.name }}
+                <template #cell-display_machine="{ row }">
+                    <span class="text-slate-700 font-medium">
+                        {{ row.display_machine || row.machine?.name || '-' }}
                     </span>
-                    <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>
 
                 <template #cell-quantity="{ value }">

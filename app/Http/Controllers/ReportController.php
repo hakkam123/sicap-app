@@ -29,8 +29,12 @@ class ReportController extends Controller
         // Build base query
         $query = Consume::query()->with([
             'partNumber:id,pn_baan,description',
+            'partNumber.areas:id,code,name',
+            'partNumber.machines:id,area_id,code,name',
+            'partNumber.machines.area:id,code,name',
             'area:id,code,name',
-            'machine:id,code,name',
+            'machine:id,area_id,code,name',
+            'machine.area:id,code,name',
         ]);
 
         if ($search) {
@@ -41,7 +45,22 @@ class ReportController extends Controller
         }
 
         if ($areaId) {
-            $query->where('area_id', $areaId);
+            if ($areaId === 'common') {
+                $query->whereHas('partNumber', function ($pnQuery) {
+                    $pnQuery->whereHas('areas', fn($a) => $a->where('code', 'FA'))
+                            ->whereHas('areas', fn($a) => $a->where('code', 'SMT'));
+                });
+            } else {
+                $query->where(function ($sub) use ($areaId) {
+                    $sub->where('consumes.area_id', $areaId)
+                        ->orWhereExists(function ($ex) use ($areaId) {
+                            $ex->select(\Illuminate\Support\Facades\DB::raw(1))
+                               ->from('area_part_number')
+                               ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
+                               ->where('area_part_number.area_id', $areaId);
+                        });
+                });
+            }
         }
 
         if ($machineId) {
@@ -74,9 +93,16 @@ class ReportController extends Controller
 
         // Area and dependent machine options
         $areas = Area::select('id', 'code', 'name')->orderBy('name')->get();
-        $machines = $areaId
-            ? Machine::where('area_id', $areaId)->select('id', 'code', 'name')->orderBy('name')->get()
-            : [];
+        $machines = [];
+        if ($areaId === 'common') {
+            $machines = Machine::with('area:id,code,name')
+                ->whereHas('area', fn($q) => $q->whereIn('code', ['FA', 'SMT']))
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->get(['id', 'area_id', 'code', 'name']);
+        } elseif ($areaId) {
+            $machines = Machine::where('area_id', $areaId)->select('id', 'area_id', 'code', 'name')->orderBy('name')->get();
+        }
 
         return Inertia::render('Reports/Index', [
             'consumptions' => $consumptions,
@@ -109,8 +135,12 @@ class ReportController extends Controller
         if ($type === 'pdf') {
             $query = Consume::query()->with([
                 'partNumber:id,pn_baan,description',
+                'partNumber.areas:id,code,name',
+                'partNumber.machines:id,area_id,code,name',
+                'partNumber.machines.area:id,code,name',
                 'area:id,code,name',
-                'machine:id,code,name',
+                'machine:id,area_id,code,name',
+                'machine.area:id,code,name',
             ]);
 
             if (!empty($filters['search'])) {
@@ -122,7 +152,23 @@ class ReportController extends Controller
             }
 
             if (!empty($filters['area_id'])) {
-                $query->where('area_id', $filters['area_id']);
+                if ($filters['area_id'] === 'common') {
+                    $query->whereHas('partNumber', function ($pnQuery) {
+                        $pnQuery->whereHas('areas', fn($a) => $a->where('code', 'FA'))
+                                ->whereHas('areas', fn($a) => $a->where('code', 'SMT'));
+                    });
+                } else {
+                    $areaId = $filters['area_id'];
+                    $query->where(function ($sub) use ($areaId) {
+                        $sub->where('consumes.area_id', $areaId)
+                            ->orWhereExists(function ($ex) use ($areaId) {
+                                $ex->select(\Illuminate\Support\Facades\DB::raw(1))
+                                   ->from('area_part_number')
+                                   ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
+                                   ->where('area_part_number.area_id', $areaId);
+                            });
+                    });
+                }
             }
 
             if (!empty($filters['machine_id'])) {
@@ -142,7 +188,10 @@ class ReportController extends Controller
             $totalQty = (int) abs($consumptions->sum('quantity'));
             $totalAmount = (float) abs($consumptions->sum('amount'));
 
-            $areaName = !empty($filters['area_id']) ? Area::find($filters['area_id'])?->name : null;
+            $areaName = null;
+            if (!empty($filters['area_id'])) {
+                $areaName = $filters['area_id'] === 'common' ? 'Common (FA & SMT)' : Area::find($filters['area_id'])?->name;
+            }
             $machineName = !empty($filters['machine_id']) ? Machine::find($filters['machine_id'])?->name : null;
 
             $pdf = Pdf::loadView('exports.report_pdf', [

@@ -30,15 +30,22 @@ class DashboardController extends Controller
         // Build base query (mendukung relasi area langsung maupun via area_part_number)
         $query = Consume::query()
             ->when($areaId, function ($q, $v) {
-                $q->where(function ($sub) use ($v) {
-                    $sub->where('consumes.area_id', $v)
-                        ->orWhereExists(function ($ex) use ($v) {
-                            $ex->select(DB::raw(1))
-                               ->from('area_part_number')
-                               ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
-                               ->where('area_part_number.area_id', $v);
-                        });
-                });
+                if ($v === 'common') {
+                    $q->whereHas('partNumber', function ($pnQuery) {
+                        $pnQuery->whereHas('areas', fn($a) => $a->where('code', 'FA'))
+                                ->whereHas('areas', fn($a) => $a->where('code', 'SMT'));
+                    });
+                } else {
+                    $q->where(function ($sub) use ($v) {
+                        $sub->where('consumes.area_id', $v)
+                            ->orWhereExists(function ($ex) use ($v) {
+                                $ex->select(DB::raw(1))
+                                   ->from('area_part_number')
+                                   ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
+                                   ->where('area_part_number.area_id', $v);
+                            });
+                    });
+                }
             })
             ->when($machineId, fn($q, $v) => $q->where('machine_id', $v))
             ->when($dateFrom, fn($q, $v) => $q->whereDate('consumed_at', '>=', $v))
@@ -218,9 +225,16 @@ class DashboardController extends Controller
 
         // 6. Filter dropdowns data & Last sync timestamp
         $areas = Area::select('id', 'code', 'name')->orderBy('name')->get();
-        $machines = $areaId
-            ? Machine::where('area_id', $areaId)->select('id', 'code', 'name')->orderBy('name')->get()
-            : [];
+        $machines = [];
+        if ($areaId === 'common') {
+            $machines = Machine::with('area:id,code,name')
+                ->whereHas('area', fn($q) => $q->whereIn('code', ['FA', 'SMT']))
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->get(['id', 'area_id', 'code', 'name']);
+        } elseif ($areaId) {
+            $machines = Machine::where('area_id', $areaId)->select('id', 'area_id', 'code', 'name')->orderBy('name')->get();
+        }
 
         $rawLastSync = Cache::get('last_api_sync_at')
             ?? Consume::where('source', 'api')->latest('created_at')->value('created_at')
@@ -264,7 +278,16 @@ class DashboardController extends Controller
             'per_page'  => 'nullable|integer|min:5|max:100',
         ]);
 
-        $query = Consume::with(['partNumber', 'area', 'machine', 'creator'])
+        $query = Consume::with([
+            'partNumber:id,pn_baan,description',
+            'partNumber.areas:id,code,name',
+            'partNumber.machines:id,area_id,code,name',
+            'partNumber.machines.area:id,code,name',
+            'area:id,code,name',
+            'machine:id,area_id,code,name',
+            'machine.area:id,code,name',
+            'creator:id,name',
+        ])
             ->when($request->date_from, fn($q) => $q->whereDate('consumed_at', '>=', $request->date_from))
             ->when($request->date_to,   fn($q) => $q->whereDate('consumed_at', '<=', $request->date_to));
 
@@ -334,8 +357,8 @@ class DashboardController extends Controller
             'date'        => $c->consumed_at?->format('d M Y'),
             'pn_baan'     => $c->partNumber?->pn_baan,
             'description' => $c->partNumber?->description,
-            'area'        => $c->area?->name,
-            'machine'     => $c->machine?->name,
+            'area'        => $c->display_area,
+            'machine'     => $c->display_machine,
             'qty'         => abs($c->quantity),
             'amount'      => abs($c->amount ?? 0),
             'source'      => $c->source,
