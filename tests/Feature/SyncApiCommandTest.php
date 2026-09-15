@@ -13,6 +13,8 @@ use Tests\TestCase;
 
 class SyncApiCommandTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_artisan_command_sync_api_runs_successfully(): void
     {
         $this->artisan('copa:sync-api')
@@ -53,6 +55,7 @@ class SyncApiCommandTest extends TestCase
                 'area_code' => $area->code,
                 'machine_code' => $machine->code,
                 'quantity' => 5,
+                'amount' => 150000.00,
                 'consumed_at' => now()->toDateTimeString(),
             ]
         ]);
@@ -65,18 +68,18 @@ class SyncApiCommandTest extends TestCase
             'area_id' => $area->id,
             'machine_id' => $machine->id,
             'quantity' => 5,
+            'amount' => 150000.00,
             'source' => 'api',
         ]);
     }
 
     public function test_manual_sync_api_web_route(): void
     {
-        $user = \App\Models\User::first();
-        if (!$user) {
-            $user = \App\Models\User::factory()->create();
-        }
+        $user = \App\Models\User::first() ?? \App\Models\User::factory()->create();
 
-        $response = $this->actingAs($user)->post(route('consume.sync-api'));
+        $response = $this->actingAs($user)
+            ->from(route('consume.index'))
+            ->post(route('consume.sync-api'));
         $response->assertRedirect(route('consume.index'));
     }
 }

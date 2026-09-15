@@ -13,16 +13,16 @@ class IndonesianFormatParser
      */
     protected static array $monthsMap = [
         'januari' => '01', 'jan' => '01', 'january' => '01',
-        'februari' => '02', 'feb' => '02', 'february' => '02',
+        'februari' => '02', 'feb' => '02', 'february' => '02', 'peb' => '02', 'pebruari' => '02',
         'maret' => '03', 'mar' => '03', 'march' => '03',
         'april' => '04', 'apr' => '04',
         'mei' => '05', 'may' => '05',
         'juni' => '06', 'jun' => '06', 'june' => '06',
         'juli' => '07', 'jul' => '07', 'july' => '07',
-        'agustus' => '08', 'agt' => '08', 'aug' => '08', 'august' => '08',
+        'agustus' => '08', 'agt' => '08', 'agu' => '08', 'aug' => '08', 'august' => '08',
         'september' => '09', 'sep' => '09', 'sept' => '09',
         'oktober' => '10', 'okt' => '10', 'oct' => '10', 'october' => '10',
-        'november' => '11', 'nov' => '11',
+        'november' => '11', 'nov' => '11', 'nop' => '11', 'nopember' => '11',
         'desember' => '12', 'des' => '12', 'dec' => '12', 'december' => '12',
     ];
 

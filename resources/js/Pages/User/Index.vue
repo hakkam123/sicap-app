@@ -10,7 +10,7 @@ import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import { Search, RotateCcw, Plus, X } from 'lucide-vue-next';
+import { Search, RotateCcw, Plus, X, Check, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-vue-next';
 
 const page = usePage();
 const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
@@ -76,11 +76,14 @@ const getRoleLabel = (user) => {
 };
 
 // ==========================================
-// 3. CREATE / EDIT MODAL FORM
+// 3. CREATE / EDIT MODAL FORM & PASSWORD RULES
 // ==========================================
 const isModalOpen = ref(false);
 const editingUser = ref(null);
 const isEditing = computed(() => !!editingUser.value);
+
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 
 const form = useForm({
     name: '',
@@ -90,11 +93,73 @@ const form = useForm({
     password_confirmation: '',
 });
 
+// Realtime Password Validation Rules
+const passwordRules = computed(() => {
+    const p = form.password || '';
+    return {
+        hasMinLength: p.length >= 8,
+        hasUppercase: /[A-Z]/.test(p),
+        hasNumber: /[0-9]/.test(p),
+        hasSymbol: /[^A-Za-z0-9]/.test(p),
+        isConfirmed: form.password_confirmation.length > 0 && p === form.password_confirmation,
+    };
+});
+
+const passwordScore = computed(() => {
+    let score = 0;
+    if (passwordRules.value.hasMinLength) score++;
+    if (passwordRules.value.hasUppercase) score++;
+    if (passwordRules.value.hasNumber) score++;
+    if (passwordRules.value.hasSymbol) score++;
+    return score;
+});
+
+const passwordStrengthText = computed(() => {
+    if (!form.password) return '';
+    switch (passwordScore.value) {
+        case 1:
+            return 'Sangat Lemah';
+        case 2:
+            return 'Lemah';
+        case 3:
+            return 'Cukup Kuat';
+        case 4:
+            return 'Sangat Kuat (Memenuhi Syarat)';
+        default:
+            return 'Belum Sesuai';
+    }
+});
+
+const isPasswordRequirementMet = computed(() => {
+    return (
+        passwordRules.value.hasMinLength &&
+        passwordRules.value.hasUppercase &&
+        passwordRules.value.hasNumber &&
+        passwordRules.value.hasSymbol
+    );
+});
+
+const isPasswordInputActive = computed(() => {
+    return !isEditing.value || (form.password && form.password.length > 0);
+});
+
+const canSubmit = computed(() => {
+    if (form.processing) return false;
+    if (!form.name || !form.email || !form.role) return false;
+    if (isPasswordInputActive.value) {
+        if (!isPasswordRequirementMet.value) return false;
+        if (form.password !== form.password_confirmation) return false;
+    }
+    return true;
+});
+
 const openCreateModal = () => {
     editingUser.value = null;
     form.reset();
     form.clearErrors();
     form.role = 'user';
+    showPassword.value = false;
+    showConfirmPassword.value = false;
     isModalOpen.value = true;
 };
 
@@ -106,6 +171,8 @@ const openEditModal = (user) => {
     form.role = user.role || 'user';
     form.password = '';
     form.password_confirmation = '';
+    showPassword.value = false;
+    showConfirmPassword.value = false;
     isModalOpen.value = true;
 };
 
@@ -114,9 +181,22 @@ const closeModal = () => {
     editingUser.value = null;
     form.reset();
     form.clearErrors();
+    showPassword.value = false;
+    showConfirmPassword.value = false;
 };
 
 const submitForm = () => {
+    if (isPasswordInputActive.value) {
+        if (!isPasswordRequirementMet.value) {
+            form.setError('password', 'Kata sandi wajib minimal 8 karakter, mengandung huruf besar, angka, dan simbol khusus.');
+            return;
+        }
+        if (form.password !== form.password_confirmation) {
+            form.setError('password_confirmation', 'Konfirmasi kata sandi tidak cocok.');
+            return;
+        }
+    }
+
     if (isEditing.value) {
         form.put(route('users.update', editingUser.value.id), {
             preserveScroll: true,
@@ -375,19 +455,123 @@ const doDelete = () => {
 
                     <!-- Password -->
                     <div>
-                        <InputLabel
-                            for="password"
-                            :value="isEditing ? 'Kata Sandi (Opsional)' : 'Kata Sandi *'"
-                        />
-                        <TextInput
-                            id="password"
-                            v-model="form.password"
-                            type="password"
-                            class="mt-1 block w-full text-xs"
-                            :required="!isEditing"
-                            :placeholder="isEditing ? 'Kosongkan jika tidak ingin mengubah kata sandi' : 'Minimal 8 karakter'"
-                        />
+                        <div class="flex items-center justify-between">
+                            <InputLabel
+                                for="password"
+                                :value="isEditing ? 'Kata Sandi (Opsional)' : 'Kata Sandi *'"
+                            />
+                            <span
+                                v-if="form.password && form.password.length > 0"
+                                class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full transition-all"
+                                :class="passwordRules.hasMinLength ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'"
+                            >
+                                {{ form.password.length }} karakter {{ passwordRules.hasMinLength ? '✓' : '(min. 8)' }}
+                            </span>
+                        </div>
+
+                        <div class="relative mt-1">
+                            <TextInput
+                                id="password"
+                                v-model="form.password"
+                                :type="showPassword ? 'text' : 'password'"
+                                class="block w-full text-xs pr-9"
+                                :required="!isEditing"
+                                :placeholder="isEditing ? 'Kosongkan jika tidak ingin mengubah kata sandi' : 'Minimal 8 karakter, ada huruf besar, angka & simbol'"
+                            />
+                            <button
+                                type="button"
+                                @click="showPassword = !showPassword"
+                                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-0.5"
+                                tabindex="-1"
+                                title="Lihat kata sandi"
+                            >
+                                <EyeOff v-if="showPassword" class="w-4 h-4" />
+                                <Eye v-else class="w-4 h-4" />
+                            </button>
+                        </div>
                         <InputError class="mt-1" :message="form.errors.password" />
+                    </div>
+
+                    <!-- Password Strength & Criteria Checklist Card -->
+                    <div
+                        v-if="isPasswordInputActive && form.password.length > 0"
+                        class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5 text-xs transition-all"
+                    >
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="font-medium text-slate-600 flex items-center gap-1.5">
+                                <Lock class="w-3.5 h-3.5 text-slate-400" />
+                                Kekuatan Kata Sandi:
+                                <span
+                                    class="font-semibold"
+                                    :class="passwordScore === 4 ? 'text-emerald-700' : passwordScore >= 2 ? 'text-amber-700' : 'text-rose-600'"
+                                >
+                                    {{ passwordStrengthText }}
+                                </span>
+                            </span>
+                            <span class="text-[10px] font-mono text-slate-500 font-medium">
+                                {{ passwordScore }}/4 Syarat Terpenuhi
+                            </span>
+                        </div>
+
+                        <!-- Progress Strength Bar -->
+                        <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                            <div
+                                class="h-full rounded-full transition-all duration-300"
+                                :class="passwordScore === 4 ? 'bg-emerald-500' : passwordScore >= 3 ? 'bg-blue-500' : passwordScore >= 2 ? 'bg-amber-500' : 'bg-rose-500'"
+                                :style="{ width: `${(passwordScore / 4) * 100}%` }"
+                            ></div>
+                        </div>
+
+                        <!-- 4 Requirements Checklist Grid -->
+                        <div class="grid grid-cols-2 gap-2 text-[11px]">
+                            <!-- 1. Min 8 Characters with live counter -->
+                            <div
+                                class="flex items-center gap-1.5 transition-colors"
+                                :class="passwordRules.hasMinLength ? 'text-emerald-700 font-medium' : 'text-slate-500'"
+                            >
+                                <Check v-if="passwordRules.hasMinLength" class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <div v-else class="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0">
+                                    <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                </div>
+                                <span>Min. 8 Karakter <span class="font-mono text-[10px]">({{ form.password.length }}/8)</span></span>
+                            </div>
+
+                            <!-- 2. Uppercase Letter -->
+                            <div
+                                class="flex items-center gap-1.5 transition-colors"
+                                :class="passwordRules.hasUppercase ? 'text-emerald-700 font-medium' : 'text-slate-500'"
+                            >
+                                <Check v-if="passwordRules.hasUppercase" class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <div v-else class="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0">
+                                    <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                </div>
+                                <span>Huruf Besar (A-Z)</span>
+                            </div>
+
+                            <!-- 3. Number -->
+                            <div
+                                class="flex items-center gap-1.5 transition-colors"
+                                :class="passwordRules.hasNumber ? 'text-emerald-700 font-medium' : 'text-slate-500'"
+                            >
+                                <Check v-if="passwordRules.hasNumber" class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <div v-else class="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0">
+                                    <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                </div>
+                                <span>Angka (0-9)</span>
+                            </div>
+
+                            <!-- 4. Special Symbol -->
+                            <div
+                                class="flex items-center gap-1.5 transition-colors"
+                                :class="passwordRules.hasSymbol ? 'text-emerald-700 font-medium' : 'text-slate-500'"
+                            >
+                                <Check v-if="passwordRules.hasSymbol" class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <div v-else class="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0">
+                                    <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                </div>
+                                <span>Simbol Khusus (!@#$%)</span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Password Confirmation -->
@@ -396,15 +580,37 @@ const doDelete = () => {
                             for="password_confirmation"
                             :value="isEditing ? 'Konfirmasi Kata Sandi Baru *' : 'Konfirmasi Kata Sandi *'"
                         />
-                        <TextInput
-                            id="password_confirmation"
-                            v-model="form.password_confirmation"
-                            type="password"
-                            class="mt-1 block w-full text-xs"
-                            :required="!isEditing || form.password.length > 0"
-                            placeholder="Ulangi kata sandi di atas..."
-                        />
+                        <div class="relative mt-1">
+                            <TextInput
+                                id="password_confirmation"
+                                v-model="form.password_confirmation"
+                                :type="showConfirmPassword ? 'text' : 'password'"
+                                class="block w-full text-xs pr-9"
+                                :required="!isEditing || form.password.length > 0"
+                                placeholder="Ulangi kata sandi di atas..."
+                            />
+                            <button
+                                type="button"
+                                @click="showConfirmPassword = !showConfirmPassword"
+                                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-0.5"
+                                tabindex="-1"
+                                title="Lihat konfirmasi kata sandi"
+                            >
+                                <EyeOff v-if="showConfirmPassword" class="w-4 h-4" />
+                                <Eye v-else class="w-4 h-4" />
+                            </button>
+                        </div>
                         <InputError class="mt-1" :message="form.errors.password_confirmation" />
+
+                        <!-- Realtime Match Feedback -->
+                        <div v-if="form.password_confirmation.length > 0" class="mt-1 text-[11px] flex items-center gap-1.5">
+                            <span v-if="passwordRules.isConfirmed" class="text-emerald-600 flex items-center gap-1 font-medium">
+                                <Check class="w-3.5 h-3.5 text-emerald-600" /> Konfirmasi kata sandi cocok
+                            </span>
+                            <span v-else class="text-rose-600 flex items-center gap-1 font-medium">
+                                <X class="w-3.5 h-3.5 text-rose-500" /> Konfirmasi kata sandi belum cocok
+                            </span>
+                        </div>
                     </div>
 
                     <!-- Buttons -->
@@ -413,7 +619,7 @@ const doDelete = () => {
                             Batal
                         </SecondaryButton>
 
-                        <PrimaryButton :disabled="form.processing">
+                        <PrimaryButton :disabled="!canSubmit || form.processing">
                             {{ isEditing ? 'Simpan Perubahan' : 'Simpan User' }}
                         </PrimaryButton>
                     </div>

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class UserRequest extends FormRequest
 {
@@ -37,7 +38,11 @@ class UserRequest extends FormRequest
             'password' => [
                 $isCreate ? 'required' : 'nullable',
                 'string',
-                'min:8',
+                Password::min(8)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols(),
                 'confirmed',
             ],
             'role' => ['required', 'string', 'in:admin,user'],
@@ -57,7 +62,6 @@ class UserRequest extends FormRequest
             'email.email' => 'Format alamat email tidak valid.',
             'email.unique' => 'Alamat email sudah terdaftar.',
             'password.required' => 'Kata sandi wajib diisi.',
-            'password.min' => 'Kata sandi minimal 8 karakter.',
             'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
             'role.required' => 'Peran (role) pengguna wajib dipilih.',
             'role.in' => 'Peran (role) harus berupa admin atau user.',

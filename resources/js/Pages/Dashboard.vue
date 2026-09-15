@@ -1106,7 +1106,7 @@ const refreshData = () => {
                                 class="group hover:bg-slate-50/70 transition-colors cursor-pointer"
                                 title="Klik untuk lihat detail"
                             >
-                                <!-- Nomor Urut (Plain, tanpa badge warna) -->
+                                <!-- Nomor Urut -->
                                 <td class="px-5 py-3 text-center">
                                     <span class="text-xs font-semibold text-slate-500 tabular-nums">
                                         {{ idx + 1 }}

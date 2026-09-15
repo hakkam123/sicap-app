@@ -56,10 +56,15 @@ class DashboardController extends Controller
         ];
 
         // 2. Daily Chart Data (grouped by date, positive Qty & Amount)
+        $driver = DB::connection()->getDriverName();
+        $dateFormat = $driver === 'sqlsrv'
+            ? 'CONVERT(varchar(10), consumed_at, 120)'
+            : "strftime('%Y-%m-%d', consumed_at)";
+
         $chartData = (clone $query)
-            ->selectRaw('CONVERT(varchar(10), consumed_at, 120) as [date], SUM(ABS(quantity)) as qty, SUM(ABS(amount)) as amount')
-            ->groupByRaw('CONVERT(varchar(10), consumed_at, 120)')
-            ->orderByRaw('CONVERT(varchar(10), consumed_at, 120) ASC')
+            ->selectRaw("{$dateFormat} as [date], SUM(ABS(quantity)) as qty, SUM(ABS(amount)) as amount")
+            ->groupByRaw($dateFormat)
+            ->orderByRaw("{$dateFormat} ASC")
             ->get()
             ->map(function ($item) {
                 return [

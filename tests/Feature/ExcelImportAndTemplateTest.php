@@ -20,6 +20,8 @@ use Tests\TestCase;
 
 class ExcelImportAndTemplateTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $admin;
 
     protected function setUp(): void
@@ -105,7 +107,6 @@ class ExcelImportAndTemplateTest extends TestCase
             [
                 'pn_baan' => 'TEST-PN-IMP-001',
                 'description' => 'Test Part Desc',
-                'price_per_unit' => 75000,
             ],
         ]);
 
@@ -113,13 +114,12 @@ class ExcelImportAndTemplateTest extends TestCase
         $this->assertDatabaseHas('part_numbers', [
             'pn_baan' => 'TEST-PN-IMP-001',
             'description' => 'Test Part Desc',
-            'price_per_unit' => 75000,
         ]);
     }
 
     public function test_mapping_import_logic(): void
     {
-        $area = Area::firstOrCreate(['code' => 'FA'], ['name' => 'Final Assembly']);
+        $area = Area::firstOrCreate(['code' => 'FA'], ['name' => 'Fabrication Area']);
         $machine = Machine::firstOrCreate(
             ['area_id' => $area->id, 'code' => 'MC_FA_01'],
             ['name' => 'Machine 1']
@@ -151,15 +151,17 @@ class ExcelImportAndTemplateTest extends TestCase
 
     public function test_consume_import_logic(): void
     {
-        $area = Area::firstOrCreate(['code' => 'FA'], ['name' => 'Final Assembly']);
+        $area = Area::firstOrCreate(['code' => 'FA'], ['name' => 'Fabrication Area']);
         $machine = Machine::firstOrCreate(
             ['area_id' => $area->id, 'code' => 'MC_FA_01'],
             ['name' => 'Machine 1']
         );
         $part = PartNumber::firstOrCreate(
             ['pn_baan' => 'TEST-PN-CONS-001'],
-            ['description' => 'Part for Consume', 'price_per_unit' => 20000]
+            ['description' => 'Part for Consume']
         );
+        $part->areas()->sync([$area->id]);
+        $part->machines()->sync([$machine->id]);
 
         Auth::login($this->admin);
 
@@ -167,21 +169,17 @@ class ExcelImportAndTemplateTest extends TestCase
         $importer->array([
             [
                 'pn_baan' => 'TEST-PN-CONS-001',
-                'area_code' => 'FA',
-                'machine_code' => 'MC_FA_01',
                 'qty' => 3,
-                'consumed_at' => now()->format('Y-m-d'),
+                'amount' => '75.000,00',
+                'date' => now()->format('Y-m-d'),
             ],
         ]);
 
         $this->assertEquals(1, $importer->successCount);
         $this->assertDatabaseHas('consumes', [
             'part_number_id' => $part->id,
-            'area_id' => $area->id,
-            'machine_id' => $machine->id,
             'quantity' => 3,
-            'amount' => 60000,
-            'source' => 'import_excel',
+            'amount' => 75000.00,
         ]);
     }
 

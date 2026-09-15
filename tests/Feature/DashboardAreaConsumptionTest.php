@@ -12,6 +12,8 @@ use Tests\TestCase;
 
 class DashboardAreaConsumptionTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_dashboard_returns_area_consumption_prop(): void
     {
         $user = User::first();
