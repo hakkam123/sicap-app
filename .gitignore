@@ -25,3 +25,19 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Tests
+/tests
+/phpunit.xml
+
+# AI Assistants & Agent documentation
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+CHATGPT.md
+*.markdown
+
+# Local sample data & spreadsheet files in root
+/*.xlsx
+/*.xls
+/*.csv
