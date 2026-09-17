@@ -13,7 +13,7 @@ use Maatwebsite\Excel\Facades\Excel;
 class ImportService
 {
     /**
-     * Process an uploaded Excel file synchronously with generic ImportLog tracking and guaranteed temp cleanup.
+     * Process an uploaded Excel file synchronously with generic ImportLog tracking, error truncation, and guaranteed temp cleanup.
      *
      * @param UploadedFile $file
      * @param string $feature ('consume', 'part_number', 'area', 'machine', 'mapping', etc.)
@@ -129,6 +129,21 @@ class ImportService
             }
         }
 
+        // Truncate error_details to max 100 entries to prevent database LOB/JSON bloat
+        $totalErrors = count($rawErrors);
+        $storedErrors = $rawErrors;
+        if ($totalErrors > 100) {
+            $storedErrors = array_slice($rawErrors, 0, 100);
+            $storedErrors[] = [
+                '__truncated__' => true,
+                'total_errors' => $totalErrors,
+                'row' => '-',
+                'field' => 'System',
+                'value' => '-',
+                'message' => "Hanya 100 baris error pertama yang disimpan di database log dari total {$totalErrors} error.",
+            ];
+        }
+
         $importLog->update([
             'status' => $status,
             'total_rows' => $total,
@@ -136,7 +151,7 @@ class ImportService
             'success_rows' => $successCount,
             'failed_rows' => $errorCount,
             'error_message' => $errorCount > 0 ? $summaryMsg : null,
-            'error_details' => $rawErrors,
+            'error_details' => $storedErrors,
             'finished_at' => now(),
         ]);
 
@@ -146,11 +161,10 @@ class ImportService
             'status' => $status,
             'message' => $summaryMsg,
             'errors' => $errorStrings,
-            'error_details' => $rawErrors,
+            'error_details' => $storedErrors,
             'total_rows' => $total,
             'success_count' => $successCount,
             'failed_count' => $errorCount,
         ];
     }
 }
-

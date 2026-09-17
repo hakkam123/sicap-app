@@ -141,10 +141,14 @@ class ConsumeController extends Controller
      */
     public function store(ConsumeRequest $request): RedirectResponse
     {
+        $part = PartNumber::with(['areas', 'machines'])->find($request->part_number_id);
+        $areaId = $request->area_id ?: ($part?->areas?->count() === 1 ? $part->areas->first()->id : null);
+        $machineId = $request->machine_id ?: ($part?->machines?->count() === 1 ? $part->machines->first()->id : null);
+
         Consume::create([
             'part_number_id' => $request->part_number_id,
-            'area_id'        => $request->area_id ?? null,
-            'machine_id'     => $request->machine_id ?? null,
+            'area_id'        => $areaId,
+            'machine_id'     => $machineId,
             'quantity'       => (int) $request->quantity,
             'amount'         => (float) $request->amount,
             'consumed_at'    => $request->consumed_at,

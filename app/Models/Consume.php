@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 class Consume extends Model
 {
@@ -60,12 +62,47 @@ class Consume extends Model
     }
 
     /**
+     * Scope query to apply consistent filtering across dashboard and reports.
+     * Supports direct area assignment as well as area mapping via area_part_number and 'common' special filter.
+     */
+    public function scopeFilteredByRequest(
+        Builder $query,
+        ?string $areaId = null,
+        ?string $machineId = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null
+    ): Builder {
+        return $query
+            ->when($areaId, function ($q, $v) {
+                if ($v === 'common') {
+                    $q->whereHas('partNumber', function ($pnQuery) {
+                        $pnQuery->whereHas('areas', fn($a) => $a->where('code', 'FA'))
+                                ->whereHas('areas', fn($a) => $a->where('code', 'SMT'));
+                    });
+                } else {
+                    $q->where(function ($sub) use ($v) {
+                        $sub->where('consumes.area_id', $v)
+                            ->orWhereExists(function ($ex) use ($v) {
+                                $ex->select(DB::raw(1))
+                                   ->from('area_part_number')
+                                   ->whereColumn('area_part_number.part_number_id', 'consumes.part_number_id')
+                                   ->where('area_part_number.area_id', $v);
+                            });
+                    });
+                }
+            })
+            ->when($machineId, fn($q, $v) => $q->where('consumes.machine_id', $v))
+            ->when($dateFrom, fn($q, $v) => $q->whereDate('consumes.consumed_at', '>=', $v))
+            ->when($dateTo, fn($q, $v) => $q->whereDate('consumes.consumed_at', '<=', $v));
+    }
+
+    /**
      * Get the dynamic display area name (Common if FA & SMT mapped, or specific area acronyms).
      */
     public function getDisplayAreaAttribute(): string
     {
         $partNumber = $this->partNumber;
-        if ($partNumber && $partNumber->relationLoaded('areas') && $partNumber->areas->isNotEmpty()) {
+        if ($partNumber && $partNumber->areas && $partNumber->areas->isNotEmpty()) {
             $codes = $partNumber->areas->map(fn($a) => !empty($a->code) ? strtoupper(trim($a->code)) : Area::abbreviate($a->name))->all();
             $hasFa = in_array('FA', $codes);
             $hasSmt = in_array('SMT', $codes);
@@ -95,7 +132,7 @@ class Consume extends Model
     public function getDisplayMachineAttribute(): string
     {
         $partNumber = $this->partNumber;
-        if ($partNumber && $partNumber->relationLoaded('machines') && $partNumber->machines->isNotEmpty()) {
+        if ($partNumber && $partNumber->machines && $partNumber->machines->isNotEmpty()) {
             $machines = $partNumber->machines->map(function ($m) {
                 $areaCode = $m->area?->code;
                 if (!$areaCode && $m->area_id) {
@@ -124,4 +161,3 @@ class Consume extends Model
         return '-';
     }
 }
-

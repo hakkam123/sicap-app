@@ -161,11 +161,18 @@ class ImportConsumeJob implements ShouldQueue
                 ]);
             }
         } catch (\Throwable $e) {
-            Log::error("ImportConsumeJob failed: " . $e->getMessage(), ['errors' => $errors]);
+            Log::error("ImportConsumeJob failed: " . $e->getMessage(), ['errors' => array_slice($errors, 0, 50)]);
 
             if ($importLog) {
-                $errorMessage = !empty($errors)
-                    ? json_encode($errors, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                $totalErrors = count($errors);
+                $truncatedErrors = $errors;
+                if ($totalErrors > 100) {
+                    $truncatedErrors = array_slice($errors, 0, 100);
+                    $truncatedErrors[] = "[TRUNCATED] Hanya 100 dari total {$totalErrors} baris error yang disimpan di log database.";
+                }
+
+                $errorMessage = !empty($truncatedErrors)
+                    ? json_encode($truncatedErrors, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
                     : $e->getMessage();
 
                 $importLog->update([

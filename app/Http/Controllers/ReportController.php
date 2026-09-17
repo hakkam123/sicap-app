@@ -199,6 +199,30 @@ class ReportController extends Controller
             }
             $machineName = !empty($filters['machine_id']) ? Machine::find($filters['machine_id'])?->name : null;
 
+            // Load AVI Official Logo as Base64 for DomPDF
+            $logoPath = public_path('LOGO-AVI-OFFICIAL.png');
+            $logoBase64 = file_exists($logoPath)
+                ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
+                : null;
+
+            // Determine Report Year for Title: "Laporan Konsumsi Sparepart YYYY"
+            $dateFromFilter = $filters['date_from'] ?? null;
+            $dateToFilter = $filters['date_to'] ?? null;
+            if ($dateFromFilter && $dateToFilter) {
+                $yFrom = date('Y', strtotime($dateFromFilter));
+                $yTo = date('Y', strtotime($dateToFilter));
+                $reportYear = $yFrom === $yTo ? $yFrom : "{$yFrom} - {$yTo}";
+            } elseif ($dateFromFilter) {
+                $reportYear = date('Y', strtotime($dateFromFilter));
+            } else {
+                $reportYear = now()->format('Y');
+            }
+
+            // Determine formatted period text
+            $periodText = ($dateFromFilter && $dateToFilter)
+                ? "{$dateFromFilter} s/d {$dateToFilter}"
+                : ($dateFromFilter ? "Mulai {$dateFromFilter}" : ($dateToFilter ? "Sampai {$dateToFilter}" : 'Semua Periode'));
+
             $pdf = Pdf::loadView('exports.report_pdf', [
                 'consumptions' => $consumptions,
                 'totalQty'     => $totalQty,
@@ -206,6 +230,9 @@ class ReportController extends Controller
                 'filters'      => $filters,
                 'areaName'     => $areaName,
                 'machineName'  => $machineName,
+                'reportYear'   => $reportYear,
+                'periodText'   => $periodText,
+                'logoBase64'   => $logoBase64,
             ])->setPaper('a4', 'landscape');
 
             return $pdf->download("{$baseFilename}.pdf");
