@@ -2,33 +2,13 @@ import { ref } from 'vue';
 import { useToast } from './useToast';
 
 /**
- * Helper function to retrieve cookie value by name.
- * Specifically used to get the dynamic XSRF-TOKEN cookie sent by Laravel.
+ * Get cookie value by name.
+ * Specifically reads the encrypted 'XSRF-TOKEN' cookie created by Laravel session.
  */
 function getCookie(name) {
     if (typeof document === 'undefined' || !document.cookie) return '';
-    const cookies = document.cookie.split('; ');
-    for (const c of cookies) {
-        const [k, ...rest] = c.split('=');
-        if (k === name) {
-            return decodeURIComponent(rest.join('='));
-        }
-    }
-    return '';
-}
-
-/**
- * Get the most up-to-date CSRF token.
- * Prioritizes dynamic XSRF-TOKEN cookie over static meta tag.
- */
-function getActiveCsrfToken() {
-    const xsrf = getCookie('XSRF-TOKEN');
-    if (xsrf) return xsrf;
-
-    const meta = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    if (meta) return meta;
-
-    return '';
+    const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+    return match ? decodeURIComponent(match[3]) : '';
 }
 
 export function useImportPolling() {
@@ -75,14 +55,26 @@ export function useImportPolling() {
             indeterminate: true,
         });
 
-        // Resolve active dynamic CSRF token
-        const activeToken = getActiveCsrfToken();
-        const xsrfCookie = getCookie('XSRF-TOKEN');
-
         const formData = new FormData();
         formData.append('file', file);
-        if (activeToken) {
-            formData.append('_token', activeToken);
+
+        // In Laravel:
+        // 1. The XSRF-TOKEN cookie contains an ENCRYPTED session token.
+        //    It MUST be passed via 'X-XSRF-TOKEN' header (Laravel automatically decrypts it).
+        // 2. The meta tag contains the UNENCRYPTED csrf_token().
+        //    It MUST be passed via 'X-CSRF-TOKEN' header.
+        const xsrfCookie = getCookie('XSRF-TOKEN');
+        const metaCsrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+        const headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+        };
+
+        if (xsrfCookie) {
+            headers['X-XSRF-TOKEN'] = xsrfCookie;
+        } else if (metaCsrfToken) {
+            headers['X-CSRF-TOKEN'] = metaCsrfToken;
         }
 
         try {
@@ -90,12 +82,7 @@ export function useImportPolling() {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json',
-                    ...(activeToken ? { 'X-CSRF-TOKEN': activeToken } : {}),
-                    ...(xsrfCookie ? { 'X-XSRF-TOKEN': xsrfCookie } : {}),
-                },
+                headers,
             });
 
             let result = {};
@@ -114,7 +101,7 @@ export function useImportPolling() {
                     indeterminate: true,
                 });
 
-                // Start polling every 1200ms
+                // Start polling status every 1200ms
                 pollTimer = setInterval(async () => {
                     try {
                         const statusRes = await fetch(`/imports/${logId}/status`, {
@@ -156,7 +143,7 @@ export function useImportPolling() {
                             if (onError) onError(logData);
                         }
                     } catch (pollErr) {
-                        // Keep polling or stop on fatal network error
+                        // Keep polling or wait
                     }
                 }, 1200);
 
