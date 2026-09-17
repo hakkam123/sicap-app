@@ -190,7 +190,12 @@ class ReportController extends Controller
 
             $areaName = null;
             if (!empty($filters['area_id'])) {
-                $areaName = $filters['area_id'] === 'common' ? 'Common (FA & SMT)' : Area::find($filters['area_id'])?->name;
+                if ($filters['area_id'] === 'common') {
+                    $areaName = 'Common (FA & SMT)';
+                } else {
+                    $foundArea = Area::find($filters['area_id']);
+                    $areaName = $foundArea ? ($foundArea->code ?: Area::abbreviate($foundArea->name)) : null;
+                }
             }
             $machineName = !empty($filters['machine_id']) ? Machine::find($filters['machine_id'])?->name : null;
 

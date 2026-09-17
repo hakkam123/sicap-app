@@ -137,6 +137,22 @@ const handlePartsReset = () => {
 };
 
 // ==========================================
+// ABBREVIATE AREA HELPER
+// ==========================================
+const abbreviateArea = (name) => {
+    if (!name) return '-';
+    const trimmed = String(name).trim();
+    if (/^common/i.test(trimmed)) return trimmed;
+    if (trimmed.includes(',')) {
+        return trimmed.split(',').map(s => abbreviateArea(s.trim())).filter(Boolean).join(', ');
+    }
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length <= 1) return trimmed.toUpperCase();
+    const initials = words.map(w => w.replace(/[^a-zA-Z0-9]/g, '')[0] || '').join('').toUpperCase();
+    return initials || trimmed.toUpperCase();
+};
+
+// ==========================================
 // TABLE COLUMNS
 // ==========================================
 const mappingColumns = [
@@ -603,8 +619,8 @@ const submitImportForm = () => {
                     </template>
 
                     <template #cell-area_name="{ row }">
-                        <span class="text-slate-700">
-                            {{ row.area_name }}
+                        <span class="text-slate-700 font-medium">
+                            {{ row.area_code || abbreviateArea(row.area_name) }}
                         </span>
                     </template>
 

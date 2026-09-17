@@ -206,6 +206,19 @@ const formatNumber = (val) => {
     if (val === null || val === undefined) return '0';
     return new Intl.NumberFormat('id-ID').format(Math.abs(Number(val)));
 };
+
+const abbreviateArea = (name) => {
+    if (!name) return '-';
+    const trimmed = String(name).trim();
+    if (/^common/i.test(trimmed)) return trimmed;
+    if (trimmed.includes(',')) {
+        return trimmed.split(',').map(s => abbreviateArea(s.trim())).filter(Boolean).join(', ');
+    }
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length <= 1) return trimmed.toUpperCase();
+    const initials = words.map(w => w.replace(/[^a-zA-Z0-9]/g, '')[0] || '').join('').toUpperCase();
+    return initials || trimmed.toUpperCase();
+};
 </script>
 
 <template>
@@ -419,7 +432,7 @@ const formatNumber = (val) => {
 
                 <template #cell-display_area="{ row }">
                     <span class="text-slate-700 font-medium">
-                        {{ row.display_area || row.area?.name || '-' }}
+                        {{ row.display_area || row.area?.code || abbreviateArea(row.area?.name) || '-' }}
                     </span>
                 </template>
 

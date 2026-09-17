@@ -200,6 +200,50 @@ const formatShortRupiah = (val) => {
     return 'Rp ' + val.toLocaleString('id-ID');
 };
 
+// Safe date parser to avoid UTC offset issues
+const parseDateSafe = (dateStr) => {
+    if (!dateStr) return null;
+    const parts = String(dateStr).split('-');
+    if (parts.length === 3) {
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+    return new Date(dateStr);
+};
+
+// Label Bulan Aktif untuk Sumbu X Horizontal
+const activeMonthLabel = computed(() => {
+    const dateFrom = filterForm.value.date_from;
+    const dateTo = filterForm.value.date_to;
+    const rawData = dailyTrend.value || [];
+
+    if (dateFrom && dateTo) {
+        const dFrom = parseDateSafe(dateFrom);
+        const dTo = parseDateSafe(dateTo);
+        if (dFrom && dTo && !isNaN(dFrom.getTime()) && !isNaN(dTo.getTime())) {
+            const mFrom = dFrom.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+            const mTo = dTo.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+            return mFrom === mTo ? mFrom : `${mFrom} - ${mTo}`;
+        }
+    } else if (dateFrom) {
+        const dFrom = parseDateSafe(dateFrom);
+        if (dFrom && !isNaN(dFrom.getTime())) {
+            return dFrom.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        }
+    }
+
+    if (rawData.length > 0) {
+        const firstDate = parseDateSafe(rawData[0]?.date);
+        const lastDate = parseDateSafe(rawData[rawData.length - 1]?.date);
+        if (firstDate && lastDate && !isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime())) {
+            const mFirst = firstDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+            const mLast = lastDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+            return mFirst === mLast ? mFirst : `${mFirst} - ${mLast}`;
+        }
+    }
+
+    return new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+});
+
 // Chart Data & Options: Tren Konsumsi Harian (Nominal Rupiah)
 const chartConfig = computed(() => {
     const rawData = dailyTrend.value || [];
@@ -241,6 +285,23 @@ const chartConfig = computed(() => {
                 },
                 tooltip: {
                     callbacks: {
+                        title: function (tooltipItems) {
+                            if (tooltipItems.length > 0) {
+                                const item = rawData[tooltipItems[0].dataIndex];
+                                if (item && item.date) {
+                                    const d = parseDateSafe(item.date);
+                                    if (d && !isNaN(d.getTime())) {
+                                        return d.toLocaleDateString('id-ID', {
+                                            day: 'numeric',
+                                            month: 'long',
+                                            year: 'numeric',
+                                        });
+                                    }
+                                    return item.date;
+                                }
+                            }
+                            return '';
+                        },
                         label: function (context) {
                             const item = rawData[context.dataIndex];
                             const amtStr = `Nominal: ${formatRupiah(item.amount)}`;
@@ -276,7 +337,27 @@ const chartConfig = computed(() => {
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { font: { size: 11 } },
+                    title: {
+                        display: true,
+                        text: activeMonthLabel.value,
+                        font: { size: 11, weight: '600' },
+                        color: '#64748b',
+                        padding: { top: 6 },
+                    },
+                    ticks: {
+                        font: { size: 11, weight: '600' },
+                        color: '#475569',
+                        callback: function (val, index) {
+                            const dateStr = rawData[index]?.date;
+                            if (!dateStr) return '';
+                            const dayMatch = String(dateStr).match(/\d{4}-\d{2}-(\d{2})/);
+                            if (dayMatch) {
+                                return parseInt(dayMatch[1], 10).toString();
+                            }
+                            const d = parseDateSafe(dateStr);
+                            return d && !isNaN(d.getDate()) ? d.getDate().toString() : dateStr;
+                        },
+                    },
                 },
                 y: {
                     beginAtZero: true,

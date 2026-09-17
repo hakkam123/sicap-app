@@ -70,14 +70,17 @@ class MappingImport implements ToArray, WithHeadingRow
                     continue;
                 }
 
-                $area = Area::where('code', $areaCode)->first();
+                $area = Area::where('code', $areaCode)
+                    ->orWhere('name', $areaCode)
+                    ->orWhere('code', Area::abbreviate($areaCode))
+                    ->first();
                 if (!$area) {
                     $this->errorCount++;
                     $this->errors[] = [
                         'row' => $rowNumber,
                         'field' => 'area_code',
                         'value' => $areaCode,
-                        'message' => "Baris {$rowNumber}: Area dengan kode '{$areaCode}' tidak ditemukan di database.",
+                        'message' => "Baris {$rowNumber}: Area '{$areaCode}' tidak ditemukan di database.",
                     ];
                     continue;
                 }

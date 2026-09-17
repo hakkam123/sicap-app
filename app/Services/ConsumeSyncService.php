@@ -133,13 +133,6 @@ class ConsumeSyncService
             ->values()
             ->all();
 
-        $areaCodes = collect($items)
-            ->map(fn($item) => isset($item['area_code']) ? trim((string)$item['area_code']) : '')
-            ->unique()
-            ->filter()
-            ->values()
-            ->all();
-
         $machineCodes = collect($items)
             ->map(fn($item) => isset($item['machine_code']) ? trim((string)$item['machine_code']) : '')
             ->unique()
@@ -148,8 +141,20 @@ class ConsumeSyncService
             ->all();
 
         $partMap = PartNumber::with(['areas', 'machines'])->whereIn('pn_baan', $pnCodes)->get()->keyBy('pn_baan');
-        $areaMap = !empty($areaCodes) ? Area::whereIn('code', $areaCodes)->get()->keyBy('code') : collect();
         $machineMap = !empty($machineCodes) ? Machine::whereIn('code', $machineCodes)->get()->keyBy('code') : collect();
+
+        // Build comprehensive area lookup mapping (supports code, full name, and acronym)
+        $allAreas = Area::all();
+        $areaLookup = [];
+        foreach ($allAreas as $a) {
+            if (!empty($a->code)) {
+                $areaLookup[strtoupper(trim($a->code))] = $a;
+            }
+            if (!empty($a->name)) {
+                $areaLookup[strtoupper(trim($a->name))] = $a;
+                $areaLookup[strtoupper(Area::abbreviate($a->name))] = $a;
+            }
+        }
 
         // 2. Validate items against master data
         foreach ($items as $index => $item) {
@@ -159,9 +164,9 @@ class ConsumeSyncService
             $rawQty = $item['qty'] ?? $item['quantity'] ?? null;
             $rawAmount = $item['amount'] ?? null;
 
-            $areaCode = isset($item['area_code']) && trim((string)$item['area_code']) !== ''
+            $rawAreaKey = isset($item['area_code']) && trim((string)$item['area_code']) !== ''
                 ? trim((string)$item['area_code'])
-                : null;
+                : (isset($item['area']) && trim((string)$item['area']) !== '' ? trim((string)$item['area']) : null);
             $machineCode = isset($item['machine_code']) && trim((string)$item['machine_code']) !== ''
                 ? trim((string)$item['machine_code'])
                 : null;
@@ -226,13 +231,13 @@ class ConsumeSyncService
 
             // 5. Validate Area (opsional jika disediakan)
             $area = null;
-            if ($areaCode !== null) {
-                $area = $areaMap->get($areaCode);
+            if ($rawAreaKey !== null) {
+                $area = $areaLookup[strtoupper($rawAreaKey)] ?? null;
                 if (!$area) {
                     $businessErrors[] = [
                         'row' => $rowNum,
                         'field' => 'area_code',
-                        'message' => "Area dengan kode '{$areaCode}' tidak ditemukan.",
+                        'message' => "Area '{$rawAreaKey}' tidak ditemukan.",
                     ];
                 }
             }

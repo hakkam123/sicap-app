@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Models\Area;
 use App\Models\Consume;
 use App\Models\PartNumber;
 use App\Support\IndonesianFormatParser;
@@ -132,8 +133,23 @@ class ConsumeImport implements ToArray, WithHeadingRow
                     continue;
                 }
 
-                // Ambil area dan mesin otomatis dari relasi mapping part_number jika tersedia
-                $mappedAreaId = $partNumber->areas->first()?->id;
+                $rawArea = $normalizedRow['area'] ?? $normalizedRow['areacode'] ?? $row['Area'] ?? $row['area'] ?? null;
+
+                // Ambil area dan mesin otomatis dari relasi mapping part_number atau kolom area excel jika ada
+                $mappedAreaId = null;
+                if (!empty($rawArea)) {
+                    $trimmedArea = trim((string) $rawArea);
+                    $foundArea = Area::where('code', $trimmedArea)
+                        ->orWhere('name', $trimmedArea)
+                        ->orWhere('code', Area::abbreviate($trimmedArea))
+                        ->first();
+                    if ($foundArea) {
+                        $mappedAreaId = $foundArea->id;
+                    }
+                }
+                if (!$mappedAreaId) {
+                    $mappedAreaId = $partNumber->areas->first()?->id;
+                }
                 $mappedMachineId = $partNumber->machines->first()?->id;
 
                 // Simpan transaksi consume dengan area & machine dari mapping

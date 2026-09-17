@@ -60,13 +60,13 @@ class Consume extends Model
     }
 
     /**
-     * Get the dynamic display area name (Common if FA & SMT mapped, or specific area names).
+     * Get the dynamic display area name (Common if FA & SMT mapped, or specific area acronyms).
      */
     public function getDisplayAreaAttribute(): string
     {
         $partNumber = $this->partNumber;
         if ($partNumber && $partNumber->relationLoaded('areas') && $partNumber->areas->isNotEmpty()) {
-            $codes = $partNumber->areas->pluck('code')->map(fn($c) => strtoupper(trim($c)))->all();
+            $codes = $partNumber->areas->map(fn($a) => !empty($a->code) ? strtoupper(trim($a->code)) : Area::abbreviate($a->name))->all();
             $hasFa = in_array('FA', $codes);
             $hasSmt = in_array('SMT', $codes);
 
@@ -75,13 +75,18 @@ class Consume extends Model
             }
 
             if (count($partNumber->areas) === 1) {
-                return $partNumber->areas->first()->name;
+                $first = $partNumber->areas->first();
+                return !empty($first->code) ? strtoupper(trim($first->code)) : Area::abbreviate($first->name);
             }
 
-            return $partNumber->areas->pluck('name')->join(', ');
+            return $partNumber->areas->map(fn($a) => !empty($a->code) ? strtoupper(trim($a->code)) : Area::abbreviate($a->name))->unique()->join(', ');
         }
 
-        return $this->area?->name ?? '-';
+        if ($this->area) {
+            return !empty($this->area->code) ? strtoupper(trim($this->area->code)) : Area::abbreviate($this->area->name);
+        }
+
+        return '-';
     }
 
     /**
@@ -96,6 +101,9 @@ class Consume extends Model
                 if (!$areaCode && $m->area_id) {
                     $areaCode = Area::find($m->area_id)?->code;
                 }
+                if (!$areaCode && $m->area?->name) {
+                    $areaCode = Area::abbreviate($m->area->name);
+                }
                 return $areaCode ? "{$m->name} ({$areaCode})" : $m->name;
             })->unique()->values();
 
@@ -104,6 +112,12 @@ class Consume extends Model
 
         if ($this->machine) {
             $areaCode = $this->machine->area?->code;
+            if (!$areaCode && $this->machine->area_id) {
+                $areaCode = Area::find($this->machine->area_id)?->code;
+            }
+            if (!$areaCode && $this->machine->area?->name) {
+                $areaCode = Area::abbreviate($this->machine->area->name);
+            }
             return $areaCode ? "{$this->machine->name} ({$areaCode})" : $this->machine->name;
         }
 

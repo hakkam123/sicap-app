@@ -173,6 +173,19 @@ const formatDate = (isoString) => {
     });
 };
 
+const abbreviateArea = (name) => {
+    if (!name) return '-';
+    const trimmed = String(name).trim();
+    if (/^common/i.test(trimmed)) return trimmed;
+    if (trimmed.includes(',')) {
+        return trimmed.split(',').map(s => abbreviateArea(s.trim())).filter(Boolean).join(', ');
+    }
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length <= 1) return trimmed.toUpperCase();
+    const initials = words.map(w => w.replace(/[^a-zA-Z0-9]/g, '')[0] || '').join('').toUpperCase();
+    return initials || trimmed.toUpperCase();
+};
+
 // ==========================================
 // 3. DELETE CONFIRMATION MODAL
 // ==========================================
@@ -693,7 +706,7 @@ const saveSchedules = () => {
 
                 <template #cell-display_area="{ row }">
                     <span class="font-medium text-slate-800">
-                        {{ row.display_area || row.area?.name || '-' }}
+                        {{ row.display_area || row.area?.code || abbreviateArea(row.area?.name) || '-' }}
                     </span>
                 </template>
 

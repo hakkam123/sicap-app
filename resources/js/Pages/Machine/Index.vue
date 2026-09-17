@@ -63,12 +63,28 @@ const resetFilter = () => {
 };
 
 // ==========================================
+// ABBREVIATE AREA HELPER
+// ==========================================
+const abbreviateArea = (name) => {
+    if (!name) return '-';
+    const trimmed = String(name).trim();
+    if (/^common/i.test(trimmed)) return trimmed;
+    if (trimmed.includes(',')) {
+        return trimmed.split(',').map(s => abbreviateArea(s.trim())).filter(Boolean).join(', ');
+    }
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length <= 1) return trimmed.toUpperCase();
+    const initials = words.map(w => w.replace(/[^a-zA-Z0-9]/g, '')[0] || '').join('').toUpperCase();
+    return initials || trimmed.toUpperCase();
+};
+
+// ==========================================
 // 2. DATA TABLE COLUMNS
 // ==========================================
 const tableColumns = [
     { key: 'code', label: 'Kode', width: 'w-36' },
     { key: 'name', label: 'Nama Machine' },
-    { key: 'area.name', label: 'Area', width: 'w-44' },
+    { key: 'area.name', label: 'Area', width: 'w-36' },
     { key: 'description', label: 'Deskripsi' },
 ];
 
@@ -343,8 +359,8 @@ const submitImport = () => {
                 </template>
 
                 <template #cell-area\.name="{ row }">
-                    <span v-if="row.area" class="text-slate-700">
-                        {{ row.area.name }}
+                    <span v-if="row.area" class="text-slate-700 font-medium">
+                        {{ row.area.code || abbreviateArea(row.area.name) }}
                     </span>
                     <span v-else class="text-slate-400 italic text-[11px]">-</span>
                 </template>

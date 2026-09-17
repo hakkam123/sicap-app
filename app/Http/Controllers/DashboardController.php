@@ -172,7 +172,7 @@ class DashboardController extends Controller
         foreach ($activeAreas as $area) {
             $areaStats[$area->id] = [
                 'area_id' => $area->id,
-                'area_name' => $area->name,
+                'area_name' => $area->code ?: Area::abbreviate($area->name),
                 'area_code' => $area->code,
                 'total_qty' => 0,
                 'total_amount' => 0.0,
@@ -338,7 +338,8 @@ class DashboardController extends Controller
                            ->where('area_part_number.area_id', $areaId);
                     });
             });
-            $title = Area::find($request->id)?->name ?? 'Area';
+            $foundArea = Area::find($request->id);
+            $title = $foundArea ? ($foundArea->code ?: Area::abbreviate($foundArea->name)) : 'Area';
         } else {
             $query->where('part_number_id', $request->id);
             $pn = PartNumber::find($request->id);
