@@ -1,6 +1,36 @@
 import { ref } from 'vue';
 import { useToast } from './useToast';
 
+/**
+ * Helper function to retrieve cookie value by name.
+ * Specifically used to get the dynamic XSRF-TOKEN cookie sent by Laravel.
+ */
+function getCookie(name) {
+    if (typeof document === 'undefined' || !document.cookie) return '';
+    const cookies = document.cookie.split('; ');
+    for (const c of cookies) {
+        const [k, ...rest] = c.split('=');
+        if (k === name) {
+            return decodeURIComponent(rest.join('='));
+        }
+    }
+    return '';
+}
+
+/**
+ * Get the most up-to-date CSRF token.
+ * Prioritizes dynamic XSRF-TOKEN cookie over static meta tag.
+ */
+function getActiveCsrfToken() {
+    const xsrf = getCookie('XSRF-TOKEN');
+    if (xsrf) return xsrf;
+
+    const meta = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (meta) return meta;
+
+    return '';
+}
+
 export function useImportPolling() {
     const isUploading = ref(false);
     const importErrors = ref([]);
@@ -45,19 +75,26 @@ export function useImportPolling() {
             indeterminate: true,
         });
 
+        // Resolve active dynamic CSRF token
+        const activeToken = getActiveCsrfToken();
+        const xsrfCookie = getCookie('XSRF-TOKEN');
+
         const formData = new FormData();
         formData.append('file', file);
-
-        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        if (activeToken) {
+            formData.append('_token', activeToken);
+        }
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 body: formData,
+                credentials: 'same-origin',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',
-                    ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+                    ...(activeToken ? { 'X-CSRF-TOKEN': activeToken } : {}),
+                    ...(xsrfCookie ? { 'X-XSRF-TOKEN': xsrfCookie } : {}),
                 },
             });
 
@@ -81,6 +118,7 @@ export function useImportPolling() {
                 pollTimer = setInterval(async () => {
                     try {
                         const statusRes = await fetch(`/imports/${logId}/status`, {
+                            credentials: 'same-origin',
                             headers: {
                                 'X-Requested-With': 'XMLHttpRequest',
                                 'Accept': 'application/json',
@@ -171,4 +209,3 @@ export function useImportPolling() {
         stopPolling,
     };
 }
-
