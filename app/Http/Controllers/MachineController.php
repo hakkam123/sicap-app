@@ -7,6 +7,7 @@ use App\Http\Requests\MachineRequest;
 use App\Imports\MachineImport;
 use App\Models\Area;
 use App\Models\Machine;
+use App\Models\PartNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,6 +57,9 @@ class MachineController extends Controller
     {
         Machine::create($request->validated());
 
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
+
         return redirect()->route('machines.index')->with('success', 'Machine berhasil ditambahkan');
     }
 
@@ -65,6 +69,9 @@ class MachineController extends Controller
     public function update(MachineRequest $request, Machine $machine): RedirectResponse
     {
         $machine->update($request->validated());
+
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
 
         return redirect()->route('machines.index')->with('success', 'Machine berhasil diperbarui');
     }
@@ -81,6 +88,9 @@ class MachineController extends Controller
         }
 
         $machine->delete();
+
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
 
         return redirect()->route('machines.index')->with('success', 'Machine berhasil dihapus');
     }
@@ -103,6 +113,9 @@ class MachineController extends Controller
             'machine',
             new MachineImport()
         );
+
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
 
         if ($request->wantsJson()) {
             return response()->json($result, $result['success'] ? 200 : 422);

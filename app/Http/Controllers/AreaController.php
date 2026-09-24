@@ -6,6 +6,7 @@ use App\Exports\AreaTemplateExport;
 use App\Http\Requests\AreaRequest;
 use App\Imports\AreaImport;
 use App\Models\Area;
+use App\Models\PartNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,6 +49,9 @@ class AreaController extends Controller
     {
         Area::create($request->validated());
 
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
+
         return redirect()->route('areas.index')->with('success', 'Area berhasil ditambahkan');
     }
 
@@ -57,6 +61,9 @@ class AreaController extends Controller
     public function update(AreaRequest $request, Area $area): RedirectResponse
     {
         $area->update($request->validated());
+
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
 
         return redirect()->route('areas.index')->with('success', 'Area berhasil diperbarui');
     }
@@ -74,6 +81,9 @@ class AreaController extends Controller
         }
 
         $area->delete();
+
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
 
         return redirect()->route('areas.index')->with('success', 'Area berhasil dihapus');
     }
@@ -96,6 +106,9 @@ class AreaController extends Controller
             'area',
             new AreaImport()
         );
+
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
 
         if ($request->wantsJson()) {
             return response()->json($result, $result['success'] ? 200 : 422);

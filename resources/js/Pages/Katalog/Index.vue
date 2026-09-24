@@ -18,9 +18,16 @@ import {
 
 const props = defineProps({
     parts: {
-        type: Array,
+        type: [Array, Object],
         default: () => [],
     },
+});
+
+// Defensive: normalize parts to always be an Array (handle Object from stale cache)
+const partsList = computed(() => {
+    if (Array.isArray(props.parts)) return props.parts;
+    if (props.parts && typeof props.parts === 'object') return Object.values(props.parts);
+    return [];
 });
 
 // ==========================================
@@ -43,7 +50,7 @@ watch(searchInput, (newVal) => {
 // Area list extracted from all parts for filtering
 const uniqueAreas = computed(() => {
     const areaMap = new Map();
-    props.parts.forEach(p => {
+    partsList.value.forEach(p => {
         (p.areas || []).forEach(a => {
             if (typeof a === 'string') {
                 if (!areaMap.has(a)) areaMap.set(a, { id: a, name: a, code: a });
@@ -63,7 +70,7 @@ const filteredParts = computed(() => {
     const status = filterAddressingStatus.value;
     const areaFilter = selectedArea.value;
 
-    return props.parts.filter(part => {
+    return partsList.value.filter(part => {
         // Addressing Status Filter
         const hasAddressing = !!(part.addressing && part.addressing.trim());
         if (status === 'addressed' && !hasAddressing) return false;
@@ -106,8 +113,8 @@ const filteredParts = computed(() => {
 });
 
 // Summary Counts
-const totalCount = computed(() => props.parts.length);
-const addressedCount = computed(() => props.parts.filter(p => !!(p.addressing && p.addressing.trim())).length);
+const totalCount = computed(() => partsList.value.length);
+const addressedCount = computed(() => partsList.value.filter(p => !!(p.addressing && p.addressing.trim())).length);
 const unaddressedCount = computed(() => totalCount.value - addressedCount.value);
 
 // Helper to format machines comma-separated
@@ -332,7 +339,7 @@ const resetAllFilters = () => {
                                 <th class="py-3 px-4 min-w-[160px]">Nomor Sparepart (PN BAAN)</th>
                                 <th class="py-3 px-4 min-w-[130px]">Kode Sparepart</th>
                                 <th class="py-3 px-4 min-w-[200px]">Nama Sparepart</th>
-                                <th class="py-3 px-4 min-w-[220px]">Addressing (Lokasi)</th>
+                                <th class="py-3 px-4 min-w-[220px]">Addressing</th>
                                 <th class="py-3 px-4 min-w-[160px]">Machine</th>
                                 <th class="py-3 px-4 min-w-[100px]">Area</th>
                             </tr>

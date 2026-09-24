@@ -44,56 +44,52 @@ class PartNumber extends Model
     }
 
     /**
-     * Scope query to select catalog fields and eager load mapping.
+     * Scope query to select catalog fields (tanpa eager load — dilakukan di getCatalogData via chunk).
      */
     public function scopeForCatalog(Builder $query): Builder
     {
         return $query->select(['id', 'pn_baan', 'part_number_code', 'description', 'addressing'])
-            ->with([
-                'machines' => fn ($q) => $q->select(['machines.id', 'machines.code', 'machines.name', 'machines.area_id'])->whereNull('machines.deleted_at')->orderBy('machines.code'),
-                'areas' => fn ($q) => $q->select(['areas.id', 'areas.code', 'areas.name'])->whereNull('areas.deleted_at')->orderBy('areas.code'),
-            ])
-            ->orderBy('pn_baan');
+            ->orderBy('pn_baan', 'asc');
     }
 
     /**
-     * Get transformed catalog data cached for 5 minutes as a pure array.
-     * Storing plain array prevents __PHP_Incomplete_Class deserialization issues across cache drivers.
-     *
-     * @return array
+     * Get transformed catalog data cached for 5 minutes.
+     * Return plain array agar aman disimpan di cache (tidak menyimpan Collection/Model).
      */
     public static function getCatalogData(): array
     {
-        $cached = Cache::remember(self::CATALOG_CACHE_KEY, self::CATALOG_CACHE_TTL_SECONDS, function () {
-            return static::forCatalog()
-                ->get()
-                ->map(function (PartNumber $part) {
-                    $machines = $part->machines->map(fn ($m) => $m->code ?: $m->name)->filter()->values()->all();
-                    $areas = $part->areas->map(fn ($a) => $a->code ?: $a->name)->filter()->values()->all();
+        return Cache::remember(self::CATALOG_CACHE_KEY, self::CATALOG_CACHE_TTL_SECONDS, function () {
+            $results = [];
 
-                    return [
-                        'id'               => $part->id,
-                        'pn_baan'          => $part->pn_baan,
-                        'part_number_code' => $part->part_number_code,
-                        'description'      => $part->description,
-                        'addressing'       => $part->addressing,
-                        'machines_text'    => !empty($machines) ? implode(', ', $machines) : '-',
-                        'areas_text'       => !empty($areas) ? implode(', ', $areas) : '-',
-                        'machines'         => $machines,
-                        'areas'            => $areas,
-                    ];
-                })
-                ->values()
-                ->all();
+            static::forCatalog()
+                ->whereNull('deleted_at')
+                ->chunk(200, function ($parts) use (&$results) {
+                    // Eager load relasi per chunk — aman dari limit 2100 parameter SQL Server
+                    $parts->load([
+                        'areas' => fn ($q) => $q->select(['areas.id', 'areas.code', 'areas.name'])->whereNull('areas.deleted_at')->orderBy('areas.code'),
+                        'machines' => fn ($q) => $q->select(['machines.id', 'machines.code', 'machines.name', 'machines.area_id'])->whereNull('machines.deleted_at')->orderBy('machines.code'),
+                    ]);
+
+                    foreach ($parts as $part) {
+                        $machines = $part->machines->map(fn ($m) => $m->code ?: $m->name)->filter()->values()->toArray();
+                        $areas = $part->areas->map(fn ($a) => $a->code ?: $a->name)->filter()->values()->toArray();
+
+                        $results[] = [
+                            'id'               => $part->id,
+                            'pn_baan'          => $part->pn_baan,
+                            'part_number_code' => $part->part_number_code,
+                            'description'      => $part->description,
+                            'addressing'       => $part->addressing,
+                            'machines_text'    => !empty($machines) ? implode(', ', $machines) : '-',
+                            'areas_text'       => !empty($areas) ? implode(', ', $areas) : '-',
+                            'machines'         => $machines,
+                            'areas'            => $areas,
+                        ];
+                    }
+                });
+
+            return $results;
         });
-
-        // Ensure we always return an array even if cache previously contained an incomplete class
-        if (!is_array($cached)) {
-            static::clearCatalogCache();
-            return static::getCatalogData();
-        }
-
-        return $cached;
     }
 
     /**
@@ -104,3 +100,4 @@ class PartNumber extends Model
         Cache::forget(self::CATALOG_CACHE_KEY);
     }
 }
+

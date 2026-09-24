@@ -131,6 +131,9 @@ class MappingController extends Controller
             $partNumber->machines()->sync($validated['machine_ids'] ?? []);
         });
 
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
+
         return redirect()->back()->with('success', 'Mapping berhasil disimpan');
     }
 
@@ -152,6 +155,9 @@ class MappingController extends Controller
             'mapping',
             new MappingImport()
         );
+
+        // Invalidate katalog cache karena data terkait berubah
+        PartNumber::clearCatalogCache();
 
         if ($request->wantsJson()) {
             return response()->json($result, $result['success'] ? 200 : 422);

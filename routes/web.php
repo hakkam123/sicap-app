@@ -21,7 +21,9 @@ Route::get('/', function () {
 });
 
 // Halaman Publik Katalog Sparepart & Addressing (Tanpa Login)
-Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
+Route::get('/katalog', [KatalogController::class, 'index'])
+    ->middleware('throttle:katalog-public')
+    ->name('katalog.index');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth'])

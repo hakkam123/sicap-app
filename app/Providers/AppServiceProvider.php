@@ -47,5 +47,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api-token-create', function (Request $request) {
             return Limit::perMinute(5)->by($request->ip());
         });
+
+        // 3. Rate limiter untuk katalog sparepart publik (60 request/menit per IP)
+        RateLimiter::for('katalog-public', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
+        });
     }
 }
