@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\AddressingController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ConsumeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ErrorMonitoringController;
 use App\Http\Controllers\ImportLogController;
+use App\Http\Controllers\KatalogController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\MappingController;
 use App\Http\Controllers\PartNumberController;
@@ -13,9 +15,13 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
+// Public Root Redirect
 Route::get('/', function () {
     return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
 });
+
+// Halaman Publik Katalog Sparepart & Addressing (Tanpa Login)
+Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth'])
@@ -64,6 +70,14 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::post('/part-numbers/import', [PartNumberController::class, 'import'])->name('part-numbers.import');
     Route::get('/part-numbers/template', [PartNumberController::class, 'downloadTemplate'])->name('part-numbers.template');
     Route::resource('part-numbers', PartNumberController::class)->except(['create', 'edit', 'show']);
+
+    // Addressing Management (Inside Admin)
+    Route::prefix('addressing')->name('addressing.')->group(function () {
+        Route::post('/', [AddressingController::class, 'store'])->name('store');
+        Route::put('/{partNumber}', [AddressingController::class, 'update'])->name('update');
+        Route::post('/import', [AddressingController::class, 'import'])->name('import');
+        Route::get('/template', [AddressingController::class, 'template'])->name('template');
+    });
 
     // Mapping Part <-> Area & Machine (Unified)
     Route::get('/mapping', [MappingController::class, 'index'])->name('mapping.index');

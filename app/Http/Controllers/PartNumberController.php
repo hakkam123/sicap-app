@@ -7,6 +7,7 @@ use App\Http\Requests\PartNumberRequest;
 use App\Imports\PartNumberImport;
 use App\Models\Area;
 use App\Models\PartNumber;
+use App\Services\ImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,9 @@ class PartNumberController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('pn_baan', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                  ->orWhere('part_number_code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('addressing', 'like', "%{$search}%");
             });
         }
 
@@ -42,10 +45,16 @@ class PartNumberController extends Controller
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
 
+        // Ambil daftar semua part number untuk opsi di modal addressing
+        $allPartOptions = PartNumber::query()
+            ->orderBy('pn_baan')
+            ->get(['id', 'pn_baan', 'part_number_code', 'description', 'addressing']);
+
         return Inertia::render('PartNumber/Index', [
-            'partNumbers' => $partNumbers,
-            'areas'       => $areas,
-            'filters'     => [
+            'partNumbers'    => $partNumbers,
+            'areas'          => $areas,
+            'allPartOptions' => $allPartOptions,
+            'filters'        => [
                 'search'   => $request->input('search', ''),
                 'per_page' => (int) $request->input('per_page', 10),
             ],
@@ -67,6 +76,8 @@ class PartNumberController extends Controller
             $partNumber->machines()->sync($request->input('machine_ids', []));
         }
 
+        PartNumber::clearCatalogCache();
+
         return redirect()->route('part-numbers.index')->with('success', 'Part Number berhasil ditambahkan');
     }
 
@@ -85,6 +96,8 @@ class PartNumberController extends Controller
             $partNumber->machines()->sync($request->input('machine_ids', []));
         }
 
+        PartNumber::clearCatalogCache();
+
         return redirect()->route('part-numbers.index')->with('success', 'Part Number berhasil diperbarui');
     }
 
@@ -100,6 +113,7 @@ class PartNumberController extends Controller
         }
 
         $partNumber->delete();
+        PartNumber::clearCatalogCache();
 
         return redirect()->route('part-numbers.index')->with('success', 'Part Number berhasil dihapus');
     }
@@ -107,14 +121,14 @@ class PartNumberController extends Controller
     /**
      * Import part numbers from Excel.
      */
-    public function import(Request $request, \App\Services\ImportService $importService)
+    public function import(Request $request, ImportService $importService)
     {
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
         ], [
             'file.required' => 'File Excel wajib dipilih.',
-            'file.mimes' => 'Format file harus .xlsx atau .xls.',
-            'file.max' => 'Ukuran file maksimal 10MB.',
+            'file.mimes'    => 'Format file harus .xlsx atau .xls.',
+            'file.max'      => 'Ukuran file maksimal 10MB.',
         ]);
 
         $result = $importService->process(
@@ -122,6 +136,8 @@ class PartNumberController extends Controller
             'part_number',
             new PartNumberImport()
         );
+
+        PartNumber::clearCatalogCache();
 
         if ($request->wantsJson()) {
             return response()->json($result, $result['success'] ? 200 : 422);
