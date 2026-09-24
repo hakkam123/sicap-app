@@ -61,7 +61,6 @@ watch(
                             :href="route('login')"
                             class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-900 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 transition shadow-xs"
                         >
-                            <LogIn class="w-3.5 h-3.5" />
                             <span>Masuk Sistem</span>
                         </Link>
                     </template>

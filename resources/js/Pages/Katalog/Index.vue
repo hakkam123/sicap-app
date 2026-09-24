@@ -121,7 +121,7 @@ const unaddressedCount = computed(() => totalCount.value - addressedCount.value)
 const formatMachines = (machines, fallback) => {
     if (fallback && fallback !== '-') return fallback;
     if (!machines || machines.length === 0) return '-';
-    return machines.map(m => typeof m === 'string' ? m : (m.code ? `${m.name} (${m.code})` : m.name)).join(', ');
+    return machines.map(m => typeof m === 'string' ? m : (m.name || m.code)).join(', ');
 };
 
 // Helper to format areas comma-separated

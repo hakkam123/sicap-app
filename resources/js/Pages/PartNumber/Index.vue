@@ -81,7 +81,7 @@ const tableColumns = [
     { key: 'pn_baan', label: 'PN BAAN', width: 'w-44' },
     { key: 'part_number_code', label: 'Kode Part', width: 'w-36' },
     { key: 'description', label: 'Deskripsi' },
-    { key: 'addressing', label: 'Addressing (Lokasi)', width: 'w-48' },
+    { key: 'addressing', label: 'Addressing', width: 'w-48' },
     { key: 'areas_count', label: 'Area Mapping', align: 'center', width: 'w-28' },
     { key: 'machines_count', label: 'Machine Mapping', align: 'center', width: 'w-32' },
 ];

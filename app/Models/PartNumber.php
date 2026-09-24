@@ -67,11 +67,11 @@ class PartNumber extends Model
                     // Eager load relasi per chunk — aman dari limit 2100 parameter SQL Server
                     $parts->load([
                         'areas' => fn ($q) => $q->select(['areas.id', 'areas.code', 'areas.name'])->whereNull('areas.deleted_at')->orderBy('areas.code'),
-                        'machines' => fn ($q) => $q->select(['machines.id', 'machines.code', 'machines.name', 'machines.area_id'])->whereNull('machines.deleted_at')->orderBy('machines.code'),
+                        'machines' => fn ($q) => $q->select(['machines.id', 'machines.code', 'machines.name', 'machines.area_id'])->whereNull('machines.deleted_at')->orderBy('machines.name'),
                     ]);
 
                     foreach ($parts as $part) {
-                        $machines = $part->machines->map(fn ($m) => $m->code ?: $m->name)->filter()->values()->toArray();
+                        $machines = $part->machines->map(fn ($m) => $m->name ?: $m->code)->filter()->values()->toArray();
                         $areas = $part->areas->map(fn ($a) => $a->code ?: $a->name)->filter()->values()->toArray();
 
                         $results[] = [
