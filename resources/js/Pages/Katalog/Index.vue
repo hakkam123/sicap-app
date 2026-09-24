@@ -184,20 +184,17 @@ const resetAllFilters = () => {
             <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-md border border-slate-700/50">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                     <div class="space-y-1.5 max-w-2xl">
-                        <div class="inline-flex items-center gap-2 px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-semibold">
-                            <MapPin class="w-3.5 h-3.5" />
-                            <span>Katalog Lokasi & Addressing Rak</span>
-                        </div>
+
                         <h2 class="text-xl sm:text-2xl font-bold tracking-tight">
                             Katalog Sparepart PT Astra Visteon Indonesia
                         </h2>
                         <p class="text-xs sm:text-sm text-slate-300">
-                            Cari nomor part (PN BAAN), kode sparepart, lokasi addressing rak/lemari, serta mapping mesin dan area secara real-time.
+                            Cari nomor part, kode sparepart, lokasi addressing, serta mapping mesin dan area secara real-time.
                         </p>
                     </div>
 
                     <!-- Mini KPI Badges -->
-                    <div class="grid grid-cols-3 gap-2 sm:gap-3 shrink-0">
+                    <!-- <div class="grid grid-cols-3 gap-2 sm:gap-3 shrink-0">
                         <div class="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-3 text-center">
                             <p class="text-[11px] font-medium text-slate-300 uppercase tracking-wider">Total Part</p>
                             <p class="text-lg sm:text-xl font-extrabold text-white mt-0.5">{{ totalCount.toLocaleString() }}</p>
@@ -210,7 +207,7 @@ const resetAllFilters = () => {
                             <p class="text-[11px] font-medium text-amber-300 uppercase tracking-wider">Belum Ada</p>
                             <p class="text-lg sm:text-xl font-extrabold text-amber-400 mt-0.5">{{ unaddressedCount.toLocaleString() }}</p>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
 
@@ -336,7 +333,7 @@ const resetAllFilters = () => {
                         <thead>
                             <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-700 uppercase font-bold text-[11px] tracking-wider">
                                 <th class="py-3 px-4 w-12 text-center text-slate-400">#</th>
-                                <th class="py-3 px-4 min-w-[160px]">Nomor Sparepart (PN BAAN)</th>
+                                <th class="py-3 px-4 min-w-[160px]">Nomor Sparepart</th>
                                 <th class="py-3 px-4 min-w-[130px]">Kode Sparepart</th>
                                 <th class="py-3 px-4 min-w-[200px]">Nama Sparepart</th>
                                 <th class="py-3 px-4 min-w-[220px]">Addressing</th>

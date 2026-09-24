@@ -36,24 +36,16 @@ watch(
                 <!-- Brand & Logo -->
                 <div class="flex items-center gap-3.5">
                     <Link :href="route('katalog.index')" class="flex items-center gap-3 hover:opacity-95 transition-opacity">
-                        <img
-                            src="/copa-text.png"
-                            alt="COPA"
-                            class="h-12 sm:h-14 w-auto object-contain"
-                        />
                         <div class="hidden sm:block border-l border-slate-200 pl-3.5">
                             <h1 class="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
-                                <Layers class="w-4 h-4 text-emerald-600" />
+                                <Layers class="w-4 h-4 text-slate-900" />
                                 Katalog Sparepart & Addressing
                             </h1>
-                            <p class="text-[11px] text-slate-500 font-medium">
-                                PT Astra Visteon Indonesia
-                            </p>
                         </div>
                     </Link>
                 </div>
 
-                <!-- Right Action (Masuk Sistem / Dashboard) -->
+                <!-- Right Action (Masuk Sistem) -->
                 <div class="flex items-center gap-3">
                     <template v-if="user">
                         <Link
@@ -61,7 +53,7 @@ watch(
                             class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-900 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 transition shadow-xs"
                         >
                             <LayoutDashboard class="w-3.5 h-3.5" />
-                            <span>Buka Dashboard ({{ user.name }})</span>
+                            <span>Buka Dashboard</span>
                         </Link>
                     </template>
                     <template v-else>
@@ -86,7 +78,7 @@ watch(
         <!-- Footer -->
         <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
             <div class="max-w-7xl mx-auto px-4">
-                &copy; {{ new Date().getFullYear() }} <strong>PT Astra Visteon Indonesia</strong> &bull; Consumption Part Application (COPA / SICAP)
+                &copy; {{ new Date().getFullYear() }} <strong>PT Astra Visteon Indonesia</strong> &bull; Consumption Part Application
             </div>
         </footer>
 
@@ -94,3 +86,4 @@ watch(
         <ToastContainer />
     </div>
 </template>
+

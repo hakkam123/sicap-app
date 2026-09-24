@@ -194,13 +194,6 @@ const submit = () => {
 
                 </form>
 
-                <!-- Footer -->
-                <div class="mt-8 pt-5 border-t border-slate-100">
-                    <p class="text-[11px] text-slate-400">
-                        © 2026 PT Astra Visteon Indonesia
-                    </p>
-                </div>
-
             </div>
         </div>
     </div>
