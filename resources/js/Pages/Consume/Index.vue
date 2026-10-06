@@ -1044,7 +1044,7 @@ const saveSchedules = () => {
                         <div class="flex items-center gap-2">
                             <Clock class="w-4 h-4 text-emerald-600" />
                             <h4 class="text-xs font-bold text-slate-800">
-                                Jadwal Penarikan Otomatis (Harian)
+                                Jadwal Penarikan Otomatis
                             </h4>
                         </div>
                         <span
@@ -1123,29 +1123,6 @@ const saveSchedules = () => {
                                 <span>{{ isSavingSchedule ? 'Menyimpan...' : 'Simpan Jadwal' }}</span>
                             </button>
                         </div>
-                    </div>
-                </div>
-
-                <!-- 3. Integrasi Lanjutan (Collapsible untuk IT / Pengembang) -->
-                <div class="border border-slate-200 rounded-xl overflow-hidden">
-                    <button
-                        type="button"
-                        @click="showAdvancedSettings = !showAdvancedSettings"
-                        class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition text-left cursor-pointer"
-                    >
-                        <span>Integrasi Lanjutan / Webhook (Khusus Tim IT)</span>
-                        <component :is="showAdvancedSettings ? ChevronUp : ChevronDown" class="w-4 h-4 text-slate-500" />
-                    </button>
-                    <div v-show="showAdvancedSettings" class="p-4 bg-white space-y-2.5 text-xs border-t border-slate-200">
-                        <p class="text-[11px] text-slate-500">
-                            Sistem eksternal juga dapat mengirimkan data pemakaian secara langsung ke sistem ini melalui endpoint:
-                        </p>
-                        <div class="p-2.5 bg-slate-900 text-slate-100 rounded-lg font-mono text-[11px] overflow-x-auto">
-                            POST /api/v1/consumes/sync
-                        </div>
-                        <p class="text-[11px] text-slate-400">
-                            Header autentikasi: <code>Authorization: Bearer &lt;token&gt;</code>, <code>Accept: application/json</code>.
-                        </p>
                     </div>
                 </div>
 
