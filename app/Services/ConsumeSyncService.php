@@ -7,6 +7,7 @@ use App\Models\Consume;
 use App\Models\Machine;
 use App\Models\PartNumber;
 use App\Support\IndonesianFormatParser;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -16,27 +17,32 @@ use Illuminate\Support\Str;
 class ConsumeSyncService
 {
     /**
-     * Run full sync from external API into SICAP database.
+     * Run full sync from external API (BAAN Adjustment Data) into SICAP database.
      *
      * @param array|null $overrideItems Optional items array (for testing or manual payload)
      * @param string|null $userId ID of the user triggering manual sync (null for automated scheduler)
+     * @param string|null $dateFrom Start date filter (Y-m-d), defaults to yesterday
+     * @param string|null $dateTo End date filter (Y-m-d), defaults to today
      * @return array
      * @throws \Throwable
      */
-    public function sync(?array $overrideItems = null, ?string $userId = null): array
+    public function sync(?array $overrideItems = null, ?string $userId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $startTime = now();
         Log::info("Sync API Started at {$startTime->toDateTimeString()}");
 
         try {
             $items = $overrideItems;
+            $totalFromApi = 0;
+            $skippedCount = 0;
 
             if ($items === null) {
-                $url = config('services.external_api.url', env('EXTERNAL_API_URL'));
-                $token = config('services.external_api.token', env('EXTERNAL_API_TOKEN'));
-                $timeout = (int) config('services.external_api.timeout', env('EXTERNAL_API_TIMEOUT', 60));
+                $baseUrl = rtrim(config('services.external_api.url', ''), '/');
+                $username = config('services.external_api.username', '');
+                $password = config('services.external_api.password', '');
+                $timeout = (int) config('services.external_api.timeout', 60);
 
-                if (empty($url)) {
+                if (empty($baseUrl)) {
                     $msg = 'EXTERNAL_API_URL belum dikonfigurasi di file .env.';
                     Log::warning("Sync API Warning: {$msg}");
 
@@ -45,51 +51,130 @@ class ConsumeSyncService
                         'message' => $msg,
                         'total' => 0,
                         'synced_count' => 0,
+                        'skipped_count' => 0,
                         'start_time' => $startTime->toDateTimeString(),
                         'end_time' => now()->toDateTimeString(),
                         'duration_seconds' => 0,
                     ];
                 }
 
-                $client = Http::timeout($timeout);
-                if (!empty($token)) {
-                    $client = $client->withToken($token);
-                }
+                $dateFrom = $dateFrom ?: now()->subDay()->format('Y-m-d');
+                $dateTo = $dateTo ?: now()->format('Y-m-d');
 
-                $response = $client->acceptJson()->get($url);
+                $response = Http::timeout($timeout)
+                    ->withBasicAuth($username, $password)
+                    ->acceptJson()
+                    ->get("{$baseUrl}/api/GetAdjustmentData", [
+                        'dateFrom' => $dateFrom,
+                        'dateTo' => $dateTo,
+                    ]);
 
                 if (!$response->successful()) {
-                    throw new \Exception("Gagal menghubungi API eksternal (HTTP {$response->status()}): " . Str::limit($response->body(), 300));
+                    throw new \Exception(
+                        "Gagal menghubungi API eksternal (HTTP {$response->status()}): "
+                        . Str::limit($response->body(), 300)
+                    );
                 }
 
                 $payload = $response->json();
-                $items = $payload['consumes'] ?? $payload['data'] ?? $payload;
 
-                if (!is_array($items)) {
-                    throw new \Exception("Format respons API tidak valid: payload bukan array data.");
+                if (($payload['Status'] ?? '') !== 'success') {
+                    throw new \Exception(
+                        'API mengembalikan error: ' . ($payload['Message'] ?? 'Tidak ada pesan error.')
+                    );
                 }
+
+                $apiData = $payload['Data'] ?? [];
+                $totalFromApi = count($apiData);
+
+                if (empty($apiData)) {
+                    Cache::forever('last_api_sync_at', now()->toIso8601String());
+
+                    return [
+                        'status' => 'success',
+                        'message' => "Tidak ada data baru dari API untuk periode {$dateFrom} s/d {$dateTo}.",
+                        'total' => 0,
+                        'synced_count' => 0,
+                        'skipped_count' => 0,
+                        'start_time' => $startTime->toDateTimeString(),
+                        'end_time' => now()->toDateTimeString(),
+                        'duration_seconds' => now()->diffInSeconds($startTime),
+                    ];
+                }
+
+                // Transform BAAN API response to internal format
+                $items = collect($apiData)->map(fn($row) => [
+                    'part_number' => trim($row['Item'] ?? ''),
+                    'date' => $row['TransactionDate'] ?? null,
+                    'qty' => (int) ($row['Qty'] ?? 0),
+                    'amount' => $row['Amount'] ?? 0,
+                ])->all();
+
+                // Deduplicate against existing database records
+                $beforeDedup = count($items);
+                $items = $this->deduplicateApiItems($items);
+                $skippedCount = $beforeDedup - count($items);
             }
 
-            // Process items into database
+            if (empty($items)) {
+                $endTime = now();
+                Cache::forever('last_api_sync_at', $endTime->toIso8601String());
+
+                return [
+                    'status' => 'success',
+                    'message' => "Semua {$skippedCount} data sudah tersinkronisasi sebelumnya.",
+                    'total' => $totalFromApi,
+                    'synced_count' => 0,
+                    'skipped_count' => $skippedCount,
+                    'start_time' => $startTime->toDateTimeString(),
+                    'end_time' => $endTime->toDateTimeString(),
+                    'duration_seconds' => $endTime->diffInSeconds($startTime),
+                ];
+            }
+
             $result = $this->processItems($items, $userId);
 
             $endTime = now();
             $duration = $endTime->diffInSeconds($startTime);
             $syncedCount = $result['processed'] ?? 0;
+            $hasErrors = !empty($result['errors']);
 
             Cache::forever('last_api_sync_at', $endTime->toIso8601String());
 
-            Log::info("Sync API Completed at {$endTime->toDateTimeString()} ({$duration}s). Synced {$syncedCount} records.", [
-                'total_received' => count($items),
+            $messageParts = [];
+            if ($syncedCount > 0) {
+                $messageParts[] = "{$syncedCount} data berhasil disinkronkan";
+            }
+            if ($skippedCount > 0) {
+                $messageParts[] = "{$skippedCount} data sudah ada (dilewati)";
+            }
+            if ($hasErrors) {
+                $messageParts[] = count($result['errors']) . ' data gagal validasi';
+            }
+            if (empty($messageParts)) {
+                $messageParts[] = 'Tidak ada data yang diproses';
+            }
+
+            $status = 'success';
+            if ($hasErrors && $syncedCount === 0) {
+                $status = 'error';
+            } elseif ($hasErrors) {
+                $status = 'partial';
+            }
+
+            Log::info("Sync API Completed at {$endTime->toDateTimeString()} ({$duration}s).", [
+                'total_from_api' => $totalFromApi,
                 'synced_count' => $syncedCount,
+                'skipped_count' => $skippedCount,
                 'errors_count' => count($result['errors'] ?? []),
             ]);
 
             return [
-                'status' => 'success',
-                'message' => "{$syncedCount} records synced",
-                'total' => count($items),
+                'status' => $status,
+                'message' => implode(', ', $messageParts) . '.',
+                'total' => $totalFromApi ?: count($items),
                 'synced_count' => $syncedCount,
+                'skipped_count' => $skippedCount,
                 'errors' => $result['errors'] ?? [],
                 'start_time' => $startTime->toDateTimeString(),
                 'end_time' => $endTime->toDateTimeString(),
@@ -106,6 +191,62 @@ class ConsumeSyncService
 
             throw $e;
         }
+    }
+
+    /**
+     * Deduplicate incoming API items against existing database records.
+     * Uses fingerprint (pn_baan + date + qty + amount) to detect duplicates.
+     */
+    private function deduplicateApiItems(array $items): array
+    {
+        if (empty($items)) {
+            return [];
+        }
+
+        $parsedDates = [];
+        foreach ($items as $item) {
+            $d = IndonesianFormatParser::parseDate($item['date'] ?? null);
+            if ($d) {
+                $parsedDates[] = $d;
+            }
+        }
+
+        if (empty($parsedDates)) {
+            return $items;
+        }
+
+        $minDate = min($parsedDates)->copy()->startOfDay();
+        $maxDate = max($parsedDates)->copy()->endOfDay();
+
+        $existing = DB::table('consumes')
+            ->join('part_numbers', 'part_numbers.id', '=', 'consumes.part_number_id')
+            ->where('consumes.source', 'api')
+            ->whereBetween('consumes.consumed_at', [$minDate, $maxDate])
+            ->select('part_numbers.pn_baan', 'consumes.consumed_at', 'consumes.quantity', 'consumes.amount')
+            ->get();
+
+        if ($existing->isEmpty()) {
+            return $items;
+        }
+
+        $existingFps = [];
+        foreach ($existing as $r) {
+            $fp = strtoupper(trim($r->pn_baan))
+                . '|' . Carbon::parse($r->consumed_at)->format('Y-m-d')
+                . '|' . (int) $r->quantity
+                . '|' . sprintf('%.2f', (float) $r->amount);
+            $existingFps[$fp] = true;
+        }
+
+        return array_values(array_filter($items, function ($item) use ($existingFps) {
+            $date = IndonesianFormatParser::parseDate($item['date'] ?? null);
+            $fp = strtoupper(trim($item['part_number'] ?? ''))
+                . '|' . ($date ? $date->format('Y-m-d') : '')
+                . '|' . (int) ($item['qty'] ?? 0)
+                . '|' . sprintf('%.2f', (float) ($item['amount'] ?? 0));
+
+            return !isset($existingFps[$fp]);
+        }));
     }
 
     /**
@@ -260,7 +401,7 @@ class ConsumeSyncService
                 $businessErrors[] = [
                     'row' => $rowNum,
                     'field' => 'machine_code',
-                    'message' => "Machine '{$machineCode}' tidak berada di Area '{$areaCode}'.",
+                    'message' => "Machine '{$machineCode}' tidak berada di Area '{$rawAreaKey}'.",
                 ];
             }
 

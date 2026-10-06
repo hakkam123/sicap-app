@@ -247,19 +247,35 @@ class ConsumeController extends Controller
     /**
      * Trigger manual sync from external API via UI.
      */
-    public function syncApi(\App\Services\ConsumeSyncService $syncService): RedirectResponse
+    public function syncApi(Request $request, \App\Services\ConsumeSyncService $syncService): RedirectResponse
     {
-        try {
-            $result = $syncService->sync(null, Auth::id());
+        $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+        ]);
 
-            if (($result['status'] ?? '') === 'warning') {
-                return redirect()->back()->with('warning', $result['message']);
+        try {
+            $result = $syncService->sync(
+                null,
+                Auth::id(),
+                $request->input('date_from'),
+                $request->input('date_to')
+            );
+
+            $status = $result['status'] ?? 'success';
+            $message = $result['message'] ?? 'Sinkronisasi selesai.';
+
+            if ($status === 'warning') {
+                return redirect()->back()->with('warning', $message);
             }
 
-            $count = $result['synced_count'] ?? 0;
-            return redirect()->back()->with('success', "Data berhasil diperbarui: {$count} data berhasil disinkronkan.");
+            if ($status === 'error' || $status === 'partial') {
+                return redirect()->back()->with('warning', $message);
+            }
+
+            return redirect()->back()->with('success', $message);
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', "Pembaruan data gagal: {$e->getMessage()}");
+            return redirect()->back()->with('error', "Sinkronisasi gagal: {$e->getMessage()}");
         }
     }
 

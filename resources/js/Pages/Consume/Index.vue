@@ -385,8 +385,12 @@ const showAdvancedSettings = ref(false);
 
 const scheduleList = ref([]);
 const newScheduleTime = ref('');
+const syncDateFrom = ref(new Date().toISOString().split('T')[0]);
+const syncDateTo = ref(new Date().toISOString().split('T')[0]);
 
 const openApiModal = () => {
+    syncDateFrom.value = new Date().toISOString().split('T')[0];
+    syncDateTo.value = new Date().toISOString().split('T')[0];
     scheduleList.value = (props.syncSchedules && props.syncSchedules.length > 0)
         ? props.syncSchedules.map(s => ({
             id: s.id,
@@ -410,7 +414,10 @@ const closeApiModal = () => {
 
 const triggerManualSync = () => {
     isSyncing.value = true;
-    router.post(route('consume.sync-api'), {}, {
+    router.post(route('consume.sync-api'), {
+        date_from: syncDateFrom.value,
+        date_to: syncDateTo.value,
+    }, {
         preserveScroll: true,
         onFinish: () => {
             isSyncing.value = false;
@@ -994,8 +1001,28 @@ const saveSchedules = () => {
                                 Tarik Data Sekarang
                             </h4>
                             <p class="text-xs text-blue-800/80 mt-1 leading-relaxed">
-                                Ambil dan perbarui data konsumsi sparepart terbaru secara langsung dari sistem pusat tanpa menunggu jadwal rutin.
+                                Ambil data adjustment sparepart dari sistem BAAN untuk periode yang dipilih.
                             </p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[11px] font-medium text-blue-800">Dari Tanggal</label>
+                            <input
+                                type="date"
+                                v-model="syncDateFrom"
+                                :disabled="isSyncing"
+                                class="px-2.5 py-1.5 border border-blue-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:opacity-50"
+                            />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[11px] font-medium text-blue-800">Sampai Tanggal</label>
+                            <input
+                                type="date"
+                                v-model="syncDateTo"
+                                :disabled="isSyncing"
+                                class="px-2.5 py-1.5 border border-blue-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:opacity-50"
+                            />
                         </div>
                     </div>
                     <div class="pt-1">

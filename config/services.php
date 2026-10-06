@@ -37,7 +37,8 @@ return [
 
     'external_api' => [
         'url' => env('EXTERNAL_API_URL'),
-        'token' => env('EXTERNAL_API_TOKEN'),
+        'username' => env('EXTERNAL_API_USERNAME'),
+        'password' => env('EXTERNAL_API_PASSWORD'),
         'timeout' => env('EXTERNAL_API_TIMEOUT', 60),
     ],
 
