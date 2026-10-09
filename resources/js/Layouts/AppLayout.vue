@@ -44,6 +44,16 @@ watch(
     { immediate: true }
 );
 
+watch(
+    () => page.props.flash?.warning,
+    (val) => {
+        if (val) {
+            toast.warning(val, { title: 'Peringatan' });
+        }
+    },
+    { immediate: true }
+);
+
 const logout = () => {
     router.post(route('logout'));
 };
