@@ -407,12 +407,14 @@ const openApiModal = () => {
 };
 
 const closeApiModal = () => {
-    if (!isSyncing.value && !isSavingSchedule.value) {
+    if (!isSavingSchedule.value) {
         isApiModalOpen.value = false;
     }
 };
 
 let syncPollTimer = null;
+const syncBannerStatus = ref(null);
+const syncBannerMessage = ref('');
 
 const pollSyncStatus = () => {
     syncPollTimer = setInterval(async () => {
@@ -420,16 +422,30 @@ const pollSyncStatus = () => {
             const res = await fetch(route('consume.sync-status'));
             const data = await res.json();
 
-            if (data.status === 'completed' || data.status === 'failed') {
+            if (data.status === 'completed') {
                 clearInterval(syncPollTimer);
                 syncPollTimer = null;
                 isSyncing.value = false;
+                syncBannerStatus.value = 'completed';
+                syncBannerMessage.value = data.message || 'Sinkronisasi selesai.';
                 router.reload({ preserveScroll: true });
+                setTimeout(() => { syncBannerStatus.value = null; }, 15000);
+            } else if (data.status === 'failed') {
+                clearInterval(syncPollTimer);
+                syncPollTimer = null;
+                isSyncing.value = false;
+                syncBannerStatus.value = 'failed';
+                syncBannerMessage.value = data.message || 'Sinkronisasi gagal.';
+                setTimeout(() => { syncBannerStatus.value = null; }, 15000);
             }
         } catch {
             // ignore polling errors
         }
     }, 5000);
+};
+
+const dismissSyncBanner = () => {
+    syncBannerStatus.value = null;
 };
 
 onUnmounted(() => {
@@ -438,6 +454,9 @@ onUnmounted(() => {
 
 const triggerManualSync = () => {
     isSyncing.value = true;
+    syncBannerStatus.value = 'processing';
+    syncBannerMessage.value = 'Sedang menarik data dari sistem BAAN...';
+    isApiModalOpen.value = false;
     router.post(route('consume.sync-api'), {
         date_from: syncDateFrom.value,
         date_to: syncDateTo.value,
@@ -568,6 +587,48 @@ const saveSchedules = () => {
                     </button>
                 </div>
             </div>
+
+            <!-- SYNC STATUS BANNER -->
+            <transition
+                enter-active-class="transition ease-out duration-300"
+                enter-from-class="opacity-0 -translate-y-2"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition ease-in duration-200"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 -translate-y-2"
+            >
+                <div v-if="syncBannerStatus" :class="[
+                    'rounded-xl border px-4 py-3 flex items-center gap-3',
+                    syncBannerStatus === 'processing' ? 'bg-blue-50 border-blue-200' : '',
+                    syncBannerStatus === 'completed' ? 'bg-emerald-50 border-emerald-200' : '',
+                    syncBannerStatus === 'failed' ? 'bg-red-50 border-red-200' : '',
+                ]">
+                    <div v-if="syncBannerStatus === 'processing'" class="flex items-center gap-2.5 flex-1">
+                        <RefreshCw class="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                        <div>
+                            <p class="text-sm font-semibold text-blue-900">Sinkronisasi Sedang Berjalan</p>
+                            <p class="text-xs text-blue-700 mt-0.5">{{ syncBannerMessage }} Halaman akan diperbarui otomatis setelah selesai.</p>
+                        </div>
+                    </div>
+                    <div v-else-if="syncBannerStatus === 'completed'" class="flex items-center gap-2.5 flex-1">
+                        <Check class="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div>
+                            <p class="text-sm font-semibold text-emerald-900">Sinkronisasi Selesai</p>
+                            <p class="text-xs text-emerald-700 mt-0.5">{{ syncBannerMessage }}</p>
+                        </div>
+                    </div>
+                    <div v-else-if="syncBannerStatus === 'failed'" class="flex items-center gap-2.5 flex-1">
+                        <AlertCircle class="w-4 h-4 text-red-600 shrink-0" />
+                        <div>
+                            <p class="text-sm font-semibold text-red-900">Sinkronisasi Gagal</p>
+                            <p class="text-xs text-red-700 mt-0.5">{{ syncBannerMessage }}</p>
+                        </div>
+                    </div>
+                    <button v-if="syncBannerStatus !== 'processing'" @click="dismissSyncBanner" class="text-slate-400 hover:text-slate-600 p-0.5 shrink-0 cursor-pointer">
+                        <X class="w-4 h-4" />
+                    </button>
+                </div>
+            </transition>
 
             <!-- FILTER CARD -->
             <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-200">
