@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/consume/import', [ConsumeController::class, 'import'])->name('consume.import');
     Route::get('/consume/template', [ConsumeController::class, 'downloadTemplate'])->name('consume.template');
     Route::post('/consume/sync-api', [ConsumeController::class, 'syncApi'])->name('consume.sync-api');
+    Route::get('/consume/sync-status', [ConsumeController::class, 'syncStatus'])->name('consume.sync-status');
     Route::post('/consume/sync-schedules', [ConsumeController::class, 'updateSyncSchedules'])->name('consume.sync-schedules.update');
     Route::get('/consume/export', [ConsumeController::class, 'export'])->name('consume.export');
     Route::get('/consume/machines-by-area', [ConsumeController::class, 'getMachinesByArea'])->name('consume.machines-by-area');

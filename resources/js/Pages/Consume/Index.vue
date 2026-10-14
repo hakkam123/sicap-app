@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTable from '@/Components/Table/DataTable.vue';
@@ -412,6 +412,30 @@ const closeApiModal = () => {
     }
 };
 
+let syncPollTimer = null;
+
+const pollSyncStatus = () => {
+    syncPollTimer = setInterval(async () => {
+        try {
+            const res = await fetch(route('consume.sync-status'));
+            const data = await res.json();
+
+            if (data.status === 'completed' || data.status === 'failed') {
+                clearInterval(syncPollTimer);
+                syncPollTimer = null;
+                isSyncing.value = false;
+                router.reload({ preserveScroll: true });
+            }
+        } catch {
+            // ignore polling errors
+        }
+    }, 5000);
+};
+
+onUnmounted(() => {
+    if (syncPollTimer) clearInterval(syncPollTimer);
+});
+
 const triggerManualSync = () => {
     isSyncing.value = true;
     router.post(route('consume.sync-api'), {
@@ -420,8 +444,7 @@ const triggerManualSync = () => {
     }, {
         preserveScroll: true,
         onFinish: () => {
-            isSyncing.value = false;
-            isApiModalOpen.value = false;
+            pollSyncStatus();
         },
     });
 };
@@ -1033,7 +1056,7 @@ const saveSchedules = () => {
                             class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                         >
                             <RefreshCw :class="['w-3.5 h-3.5', isSyncing ? 'animate-spin' : '']" />
-                            <span>{{ isSyncing ? 'Sedang Menarik Data...' : 'Tarik Data Sekarang' }}</span>
+                            <span>{{ isSyncing ? 'Memproses di Background...' : 'Tarik Data Sekarang' }}</span>
                         </button>
                     </div>
                 </div>

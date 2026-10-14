@@ -6,6 +6,7 @@ use App\Exports\ConsumeExport;
 use App\Exports\ConsumeTemplateExport;
 use App\Http\Requests\ConsumeRequest;
 use App\Imports\ConsumeImport;
+use App\Jobs\SyncApiJob;
 use App\Models\Area;
 use App\Models\Consume;
 use App\Models\Machine;
@@ -245,38 +246,54 @@ class ConsumeController extends Controller
     }
 
     /**
-     * Trigger manual sync from external API via UI.
+     * Trigger manual sync from external API via UI (dispatched to queue).
      */
-    public function syncApi(Request $request, \App\Services\ConsumeSyncService $syncService): RedirectResponse
+    public function syncApi(Request $request): RedirectResponse
     {
         $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
         ]);
 
-        try {
-            $result = $syncService->sync(
-                null,
-                Auth::id(),
-                $request->input('date_from'),
-                $request->input('date_to')
-            );
-
-            $status = $result['status'] ?? 'success';
-            $message = $result['message'] ?? 'Sinkronisasi selesai.';
-
-            if ($status === 'warning') {
-                return redirect()->back()->with('warning', $message);
-            }
-
-            if ($status === 'error' || $status === 'partial') {
-                return redirect()->back()->with('warning', $message);
-            }
-
-            return redirect()->back()->with('success', $message);
-        } catch (\Throwable $e) {
-            return redirect()->back()->with('error', "Sinkronisasi gagal: {$e->getMessage()}");
+        $currentStatus = Cache::get('sync_api_status');
+        if ($currentStatus === 'processing') {
+            return redirect()->back()->with('warning', 'Sinkronisasi sedang berjalan, silakan tunggu hingga selesai.');
         }
+
+        Cache::put('sync_api_status', 'processing', now()->addMinutes(15));
+
+        SyncApiJob::dispatch(
+            (string) Auth::id(),
+            $request->input('date_from'),
+            $request->input('date_to')
+        );
+
+        return redirect()->back()->with('success', 'Sinkronisasi dimulai di background. Data akan muncul otomatis setelah proses selesai.');
+    }
+
+    /**
+     * Check the current sync status (polling endpoint).
+     */
+    public function syncStatus(): JsonResponse
+    {
+        $status = Cache::get('sync_api_status', 'idle');
+        $result = Cache::get('sync_api_result');
+
+        $response = ['status' => $status];
+
+        if ($status === 'completed' && $result) {
+            $response['message'] = $result['message'] ?? 'Sinkronisasi selesai.';
+            $response['synced_count'] = $result['synced_count'] ?? 0;
+            $response['skipped_count'] = $result['skipped_count'] ?? 0;
+            Cache::forget('sync_api_status');
+            Cache::forget('sync_api_result');
+        } elseif ($status === 'failed' && $result) {
+            $response['message'] = $result['message'] ?? 'Sinkronisasi gagal.';
+            Cache::forget('sync_api_status');
+            Cache::forget('sync_api_result');
+        }
+
+        return response()->json($response);
     }
 
     /**
