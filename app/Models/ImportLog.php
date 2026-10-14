@@ -59,6 +59,7 @@ class ImportLog extends Model
             'machine' => 'Machine',
             'mapping' => 'Mapping Part',
             'user' => 'User',
+            'sync_api' => 'Sync API BAAN',
             default => ucfirst(str_replace('_', ' ', (string) $this->feature)),
         };
     }

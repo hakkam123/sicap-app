@@ -33,11 +33,11 @@ const { toasts, dismiss } = useToast();
                 :key="toast.id"
                 class="pointer-events-auto w-full bg-white rounded-xl shadow-xl border overflow-hidden transition-all relative"
                 :class="[
-                    toast.type === 'success' ? 'border-emerald-200 bg-emerald-50/80 text-emerald-900' :
-                    toast.type === 'error' ? 'border-red-200 bg-red-50/80 text-red-900' :
-                    toast.type === 'warning' ? 'border-amber-200 bg-amber-50/80 text-amber-900' :
-                    toast.type === 'progress' ? 'border-slate-200 bg-white text-slate-800' :
-                    'border-blue-200 bg-blue-50/80 text-blue-900'
+                    toast.type === 'success' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' :
+                    toast.type === 'error' ? 'border-red-300 bg-red-50 text-red-900' :
+                    toast.type === 'warning' ? 'border-amber-300 bg-amber-50 text-amber-900' :
+                    toast.type === 'progress' ? 'border-slate-300 bg-white text-slate-800' :
+                    'border-blue-300 bg-blue-50 text-blue-900'
                 ]"
             >
                 <div class="p-4 flex items-start gap-3">

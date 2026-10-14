@@ -598,10 +598,10 @@ const saveSchedules = () => {
                 leave-to-class="opacity-0 -translate-y-2"
             >
                 <div v-if="syncBannerStatus" :class="[
-                    'rounded-xl border px-4 py-3 flex items-center gap-3',
-                    syncBannerStatus === 'processing' ? 'bg-blue-50 border-blue-200' : '',
-                    syncBannerStatus === 'completed' ? 'bg-emerald-50 border-emerald-200' : '',
-                    syncBannerStatus === 'failed' ? 'bg-red-50 border-red-200' : '',
+                    'rounded-xl border px-4 py-3 flex items-center gap-3 shadow-sm',
+                    syncBannerStatus === 'processing' ? 'bg-blue-50 border-blue-300' : '',
+                    syncBannerStatus === 'completed' ? 'bg-emerald-50 border-emerald-300' : '',
+                    syncBannerStatus === 'failed' ? 'bg-red-50 border-red-300' : '',
                 ]">
                     <div v-if="syncBannerStatus === 'processing'" class="flex items-center gap-2.5 flex-1">
                         <RefreshCw class="w-4 h-4 text-blue-600 animate-spin shrink-0" />
