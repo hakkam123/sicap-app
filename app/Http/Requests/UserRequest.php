@@ -27,6 +27,12 @@ class UserRequest extends FormRequest
         $isCreate = $this->isMethod('post');
 
         return [
+            'npk' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('users', 'npk')->ignore($user),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required',
@@ -57,6 +63,8 @@ class UserRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'npk.required' => 'NPK wajib diisi.',
+            'npk.unique' => 'NPK sudah terdaftar.',
             'name.required' => 'Nama lengkap wajib diisi.',
             'email.required' => 'Alamat email wajib diisi.',
             'email.email' => 'Format alamat email tidak valid.',

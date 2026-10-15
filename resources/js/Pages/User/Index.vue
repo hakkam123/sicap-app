@@ -56,6 +56,7 @@ const resetFilter = () => {
 // 2. DATA TABLE COLUMNS & FORMATTERS
 // ==========================================
 const tableColumns = [
+    { key: 'npk', label: 'NPK', width: 'w-24' },
     { key: 'name', label: 'Nama' },
     { key: 'email', label: 'Email' },
     { key: 'role', label: 'Role', align: 'center', width: 'w-32' },
@@ -86,6 +87,7 @@ const showPassword = ref(false);
 const showConfirmPassword = ref(false);
 
 const form = useForm({
+    npk: '',
     name: '',
     email: '',
     role: 'user',
@@ -145,7 +147,7 @@ const isPasswordInputActive = computed(() => {
 
 const canSubmit = computed(() => {
     if (form.processing) return false;
-    if (!form.name || !form.email || !form.role) return false;
+    if (!form.npk || !form.name || !form.email || !form.role) return false;
     if (isPasswordInputActive.value) {
         if (!isPasswordRequirementMet.value) return false;
         if (form.password !== form.password_confirmation) return false;
@@ -166,6 +168,7 @@ const openCreateModal = () => {
 const openEditModal = (user) => {
     editingUser.value = user;
     form.clearErrors();
+    form.npk = user.npk || '';
     form.name = user.name || '';
     form.email = user.email || '';
     form.role = user.role || 'user';
@@ -273,7 +276,7 @@ const doDelete = () => {
                                 <input
                                     v-model="filters.search"
                                     type="text"
-                                    placeholder="Cari nama atau email..."
+                                    placeholder="Cari NPK, nama, atau email..."
                                     class="w-64 pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                                     @keydown.enter="applyFilter"
                                 />
@@ -343,6 +346,10 @@ const doDelete = () => {
                 :columns="tableColumns"
                 :data="users"
             >
+                <template #cell-npk="{ value }">
+                    <span class="font-mono text-slate-700">{{ value || '-' }}</span>
+                </template>
+
                 <template #cell-name="{ row, value }">
                     <span class="font-medium text-slate-900">{{ value }}</span>
                     <span
@@ -409,6 +416,21 @@ const doDelete = () => {
                 </div>
 
                 <form @submit.prevent="submitForm" class="space-y-4">
+                    <!-- NPK -->
+                    <div>
+                        <InputLabel for="npk" value="NPK *" />
+                        <TextInput
+                            id="npk"
+                            v-model="form.npk"
+                            type="text"
+                            class="mt-1 block w-full text-xs"
+                            placeholder="Masukkan NPK karyawan..."
+                            required
+                            autofocus
+                        />
+                        <InputError class="mt-1" :message="form.errors.npk" />
+                    </div>
+
                     <!-- Name -->
                     <div>
                         <InputLabel for="name" value="Nama Lengkap *" />
@@ -432,7 +454,7 @@ const doDelete = () => {
                             v-model="form.email"
                             type="email"
                             class="mt-1 block w-full text-xs"
-                            placeholder="contoh: operator@copa.local"
+                            placeholder="contoh: nama@astra-visteon.com"
                             required
                         />
                         <InputError class="mt-1" :message="form.errors.email" />

@@ -23,7 +23,8 @@ class UserController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('npk', 'like', "%{$search}%");
             });
         }
 
@@ -44,6 +45,7 @@ class UserController extends Controller
     public function store(UserRequest $request): RedirectResponse
     {
         $user = User::create([
+            'npk' => $request->npk,
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
@@ -59,6 +61,7 @@ class UserController extends Controller
     public function update(UserRequest $request, User $user): RedirectResponse
     {
         $data = [
+            'npk' => $request->npk,
             'name' => $request->name,
             'email' => $request->email,
             'role' => $request->role,

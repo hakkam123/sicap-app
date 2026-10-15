@@ -10,7 +10,7 @@ defineProps({
 });
 
 const form = useForm({
-    email: '',
+    npk: '',
     password: '',
     remember: false,
 });
@@ -132,21 +132,21 @@ const submit = () => {
                 <!-- Login Form -->
                 <form @submit.prevent="submit" class="space-y-5">
                     
-                    <!-- Email -->
+                    <!-- NPK -->
                     <div>
-                        <label for="email" class="block text-xs font-semibold text-slate-700 mb-2">Email</label>
+                        <label for="npk" class="block text-xs font-semibold text-slate-700 mb-2">NPK</label>
                         <input
-                            id="email"
-                            v-model="form.email"
-                            type="email"
+                            id="npk"
+                            v-model="form.npk"
+                            type="text"
                             required
                             autofocus
                             autocomplete="username"
-                            placeholder="nama@astra-visteon.com"
+                            placeholder="Masukkan NPK Anda"
                             class="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                            :class="{ 'border-red-400 focus:border-red-500 focus:ring-red-50': form.errors.email }"
+                            :class="{ 'border-red-400 focus:border-red-500 focus:ring-red-50': form.errors.npk }"
                         />
-                        <p v-if="form.errors.email" class="mt-1.5 text-[11px] text-red-600">{{ form.errors.email }}</p>
+                        <p v-if="form.errors.npk" class="mt-1.5 text-[11px] text-red-600">{{ form.errors.npk }}</p>
                     </div>
 
                     <!-- Password -->

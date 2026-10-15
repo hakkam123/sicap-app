@@ -34,6 +34,7 @@ class HandleInertiaRequests extends Middleware
             'csrf_token' => csrf_token(),
             'auth' => [
                 'user' => $request->user() ? array_merge($request->user()->toArray(), [
+                    'npk' => $request->user()->npk,
                     'role' => $request->user()->role ?? 'user',
                     'is_admin' => $request->user()->role === 'admin',
                 ]) : null,

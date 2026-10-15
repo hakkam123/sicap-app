@@ -8,16 +8,14 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         User::firstOrCreate(
             ['email' => 'admin@copa.local'],
             [
+                'npk' => '0000',
                 'name' => 'Administrator',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('Avi123!'),
                 'role' => 'admin',
             ]
         );
