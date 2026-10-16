@@ -23,15 +23,13 @@ if (Schema::hasTable('sync_schedules')) {
                 Schedule::command('copa:sync-api')
                     ->dailyAt($schedule->time)
                     ->timezone('Asia/Jakarta')
-                    ->withoutOverlapping()
-                    ->onOneServer();
+                    ->withoutOverlapping();
             }
         }
     } catch (\Throwable $e) {
-        // Fallback to default schedules if query fails
-        Schedule::command('copa:sync-api')->dailyAt('05:00')->timezone('Asia/Jakarta')->withoutOverlapping()->onOneServer();
-        Schedule::command('copa:sync-api')->dailyAt('11:00')->timezone('Asia/Jakarta')->withoutOverlapping()->onOneServer();
-        Schedule::command('copa:sync-api')->dailyAt('17:00')->timezone('Asia/Jakarta')->withoutOverlapping()->onOneServer();
+        Schedule::command('copa:sync-api')->dailyAt('05:00')->timezone('Asia/Jakarta')->withoutOverlapping();
+        Schedule::command('copa:sync-api')->dailyAt('11:00')->timezone('Asia/Jakarta')->withoutOverlapping();
+        Schedule::command('copa:sync-api')->dailyAt('17:00')->timezone('Asia/Jakarta')->withoutOverlapping();
     }
 }
 
@@ -46,26 +44,22 @@ if (Schema::hasTable('sync_schedules')) {
 Schedule::command('queue:prune-failed --hours=168')
     ->dailyAt('02:00')
     ->timezone('Asia/Jakarta')
-    ->withoutOverlapping()
-    ->onOneServer();
+    ->withoutOverlapping();
 
 // Hapus metadata job batches yang sudah selesai/gagal > 48 jam
 Schedule::command('queue:prune-batches --hours=48')
     ->dailyAt('02:30')
     ->timezone('Asia/Jakarta')
-    ->withoutOverlapping()
-    ->onOneServer();
+    ->withoutOverlapping();
 
 // Hapus token API Sanctum yang sudah expired / tidak aktif > 30 hari (720 jam)
 Schedule::command('sanctum:prune-expired --hours=720')
     ->weeklyOn(0, '03:00')
     ->timezone('Asia/Jakarta')
-    ->withoutOverlapping()
-    ->onOneServer();
+    ->withoutOverlapping();
 
 // Cleanup log error sistem & log import lama secara chunked
 Schedule::command('copa:cleanup-logs')
     ->dailyAt('03:30')
     ->timezone('Asia/Jakarta')
-    ->withoutOverlapping()
-    ->onOneServer();
+    ->withoutOverlapping();
