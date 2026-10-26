@@ -243,7 +243,7 @@ const logout = () => {
                         />
                     </svg>
 
-                    <span>Riwayat Aktivitas</span>
+                    <span>Activity Log</span>
                 </Link>
 
                 <!-- Error Monitoring -->

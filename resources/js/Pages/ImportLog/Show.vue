@@ -89,7 +89,7 @@ const parsedErrors = computed(() => {
                     :href="route('import-logs.index')"
                     class="text-gray-500 hover:text-gray-700 text-sm"
                 >
-                    Riwayat Aktivitas
+                    Activity Log
                 </Link>
                 <span class="text-gray-400">/</span>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">

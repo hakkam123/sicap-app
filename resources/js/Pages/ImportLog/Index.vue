@@ -222,13 +222,13 @@ const handleDownloadErrorExcel = (log) => {
 
 <template>
     <AppLayout>
-        <Head title="Riwayat Aktivitas" />
+        <Head title="Activity Log" />
 
         <template #header>
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h2 class="text-xl font-bold leading-tight text-slate-800">
-                        Riwayat Aktivitas
+                        Activity Log
                     </h2>
                     <p class="text-xs text-slate-500 mt-1">
                         Monitoring status import Excel dan sinkronisasi API BAAN.
