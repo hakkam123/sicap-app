@@ -35,7 +35,7 @@ const submit = () => {
 <template>
     <div class="login-page">
 
-        <Head title="Masuk ke COPA" />
+        <Head />
 
         <!-- Background decoration -->
         <div class="background-pattern">

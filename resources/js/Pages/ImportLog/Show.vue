@@ -89,7 +89,7 @@ const parsedErrors = computed(() => {
                     :href="route('import-logs.index')"
                     class="text-gray-500 hover:text-gray-700 text-sm"
                 >
-                    Riwayat Import Log
+                    Riwayat Aktivitas
                 </Link>
                 <span class="text-gray-400">/</span>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">
@@ -144,7 +144,7 @@ const parsedErrors = computed(() => {
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                                 </svg>
-                                Kembali ke Import Log
+                                Kembali ke Riwayat
                             </SecondaryButton>
                         </Link>
                     </div>

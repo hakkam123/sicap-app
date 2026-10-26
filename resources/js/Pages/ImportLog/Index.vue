@@ -222,16 +222,16 @@ const handleDownloadErrorExcel = (log) => {
 
 <template>
     <AppLayout>
-        <Head title="Riwayat Import Log" />
+        <Head title="Riwayat Aktivitas" />
 
         <template #header>
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h2 class="text-xl font-bold leading-tight text-slate-800">
-                        Riwayat Import Log
+                        Riwayat Aktivitas
                     </h2>
                     <p class="text-xs text-slate-500 mt-1">
-                        Monitoring status proses background job dan audit rincian data import Excel.
+                        Monitoring status import Excel dan sinkronisasi API BAAN.
                     </p>
                 </div>
             </div>
