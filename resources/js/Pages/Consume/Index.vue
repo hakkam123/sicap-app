@@ -597,36 +597,57 @@ const saveSchedules = () => {
                 leave-from-class="opacity-100 translate-y-0"
                 leave-to-class="opacity-0 -translate-y-2"
             >
-                <div v-if="syncBannerStatus" :class="[
-                    'rounded-xl border px-4 py-3 flex items-center gap-3 shadow-sm',
-                    syncBannerStatus === 'processing' ? 'bg-blue-50 border-blue-300' : '',
-                    syncBannerStatus === 'completed' ? 'bg-emerald-50 border-emerald-300' : '',
-                    syncBannerStatus === 'failed' ? 'bg-red-50 border-red-300' : '',
-                ]">
-                    <div v-if="syncBannerStatus === 'processing'" class="flex items-center gap-2.5 flex-1">
-                        <RefreshCw class="w-4 h-4 text-blue-600 animate-spin shrink-0" />
-                        <div>
-                            <p class="text-sm font-semibold text-blue-900">Sinkronisasi Sedang Berjalan</p>
-                            <p class="text-xs text-blue-700 mt-0.5">{{ syncBannerMessage }} Halaman akan diperbarui otomatis setelah selesai.</p>
+                <div v-if="syncBannerStatus" class="bg-white rounded-xl shadow-md px-4 py-3.5">
+                    <div class="flex items-start gap-3">
+                        <div :class="[
+                            'shrink-0 w-8 h-8 rounded-lg flex items-center justify-center',
+                            syncBannerStatus === 'processing' ? 'bg-blue-50' : '',
+                            syncBannerStatus === 'completed' ? 'bg-emerald-50' : '',
+                            syncBannerStatus === 'failed' ? 'bg-red-50' : '',
+                        ]">
+                            <RefreshCw v-if="syncBannerStatus === 'processing'" class="w-4 h-4 text-blue-600 animate-spin" />
+                            <Check v-else-if="syncBannerStatus === 'completed'" class="w-4 h-4 text-emerald-600" />
+                            <AlertCircle v-else class="w-4 h-4 text-red-600" />
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-sm font-semibold text-slate-800 truncate">
+                                    {{ syncBannerStatus === 'processing' ? 'Sinkronisasi Sedang Berjalan' : syncBannerStatus === 'completed' ? 'Sinkronisasi Selesai' : 'Sinkronisasi Gagal' }}
+                                </p>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span :class="[
+                                        'text-xs font-semibold tabular-nums',
+                                        syncBannerStatus === 'processing' ? 'text-blue-600' : '',
+                                        syncBannerStatus === 'completed' ? 'text-emerald-600' : '',
+                                        syncBannerStatus === 'failed' ? 'text-red-600' : '',
+                                    ]">
+                                        {{ syncBannerStatus === 'processing' ? 'Berjalan' : syncBannerStatus === 'completed' ? 'Selesai' : 'Gagal' }}
+                                    </span>
+                                    <button v-if="syncBannerStatus !== 'processing'" @click="dismissSyncBanner" class="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
+                                        <X class="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                {{ syncBannerMessage }}<span v-if="syncBannerStatus === 'processing'"> Halaman akan diperbarui otomatis setelah selesai.</span>
+                            </p>
                         </div>
                     </div>
-                    <div v-else-if="syncBannerStatus === 'completed'" class="flex items-center gap-2.5 flex-1">
-                        <Check class="w-4 h-4 text-emerald-600 shrink-0" />
-                        <div>
-                            <p class="text-sm font-semibold text-emerald-900">Sinkronisasi Selesai</p>
-                            <p class="text-xs text-emerald-700 mt-0.5">{{ syncBannerMessage }}</p>
-                        </div>
+
+                    <div class="mt-3 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            v-if="syncBannerStatus === 'processing'"
+                            class="h-full w-1/3 bg-blue-600 rounded-full sync-indeterminate"
+                        ></div>
+                        <div
+                            v-else
+                            :class="[
+                                'h-full w-full rounded-full',
+                                syncBannerStatus === 'completed' ? 'bg-emerald-500' : 'bg-red-500',
+                            ]"
+                        ></div>
                     </div>
-                    <div v-else-if="syncBannerStatus === 'failed'" class="flex items-center gap-2.5 flex-1">
-                        <AlertCircle class="w-4 h-4 text-red-600 shrink-0" />
-                        <div>
-                            <p class="text-sm font-semibold text-red-900">Sinkronisasi Gagal</p>
-                            <p class="text-xs text-red-700 mt-0.5">{{ syncBannerMessage }}</p>
-                        </div>
-                    </div>
-                    <button v-if="syncBannerStatus !== 'processing'" @click="dismissSyncBanner" class="text-slate-400 hover:text-slate-600 p-0.5 shrink-0 cursor-pointer">
-                        <X class="w-4 h-4" />
-                    </button>
                 </div>
             </transition>
 
@@ -1220,3 +1241,18 @@ const saveSchedules = () => {
 
     </AppLayout>
 </template>
+
+<style scoped>
+@keyframes sync-indeterminate {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(300%);
+    }
+}
+
+.sync-indeterminate {
+    animation: sync-indeterminate 1.5s infinite ease-in-out;
+}
+</style>

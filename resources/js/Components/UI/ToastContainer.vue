@@ -31,14 +31,7 @@ const { toasts, dismiss } = useToast();
             <div
                 v-for="toast in toasts"
                 :key="toast.id"
-                class="pointer-events-auto w-full bg-white rounded-xl shadow-xl border overflow-hidden transition-all relative"
-                :class="[
-                    toast.type === 'success' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' :
-                    toast.type === 'error' ? 'border-red-300 bg-red-50 text-red-900' :
-                    toast.type === 'warning' ? 'border-amber-300 bg-amber-50 text-amber-900' :
-                    toast.type === 'progress' ? 'border-slate-300 bg-white text-slate-800' :
-                    'border-blue-300 bg-blue-50 text-blue-900'
-                ]"
+                class="pointer-events-auto w-full bg-white rounded-xl shadow-lg overflow-hidden transition-all relative"
             >
                 <div class="p-4 flex items-start gap-3">
                     <!-- Icon -->
@@ -70,14 +63,7 @@ const { toasts, dismiss } = useToast();
                         <div class="flex items-center justify-between gap-2">
                             <h4
                                 v-if="toast.title"
-                                class="text-xs font-bold leading-tight truncate"
-                                :class="[
-                                    toast.type === 'success' ? 'text-emerald-950' :
-                                    toast.type === 'error' ? 'text-red-950' :
-                                    toast.type === 'warning' ? 'text-amber-950' :
-                                    toast.type === 'progress' ? 'text-slate-900' :
-                                    'text-blue-950'
-                                ]"
+                                class="text-xs font-bold leading-tight truncate text-slate-900"
                             >
                                 {{ toast.title }}
                             </h4>
@@ -91,14 +77,7 @@ const { toasts, dismiss } = useToast();
 
                         <p
                             v-if="toast.message"
-                            class="text-xs mt-0.5 leading-relaxed break-words"
-                            :class="[
-                                toast.type === 'success' ? 'text-emerald-800' :
-                                toast.type === 'error' ? 'text-red-800' :
-                                toast.type === 'warning' ? 'text-amber-800' :
-                                toast.type === 'progress' ? 'text-slate-600' :
-                                'text-blue-800'
-                            ]"
+                            class="text-xs mt-0.5 leading-relaxed break-words text-slate-500"
                         >
                             {{ toast.message }}
                         </p>
