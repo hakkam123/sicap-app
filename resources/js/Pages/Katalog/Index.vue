@@ -5,10 +5,6 @@ import PublicLayout from '@/Layouts/PublicLayout.vue';
 import {
     Search,
     RotateCcw,
-    Layers,
-    MapPin,
-    Cpu,
-    CheckCircle2,
     AlertCircle,
     ChevronLeft,
     ChevronRight,
@@ -180,39 +176,8 @@ const resetAllFilters = () => {
 
         <div class="space-y-6">
 
-            <!-- HERO & STATS HEADER -->
-            <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-md border border-slate-700/50">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                    <div class="space-y-1.5 max-w-2xl">
-
-                        <h2 class="text-xl sm:text-2xl font-bold tracking-tight">
-                            Katalog Sparepart PT Astra Visteon Indonesia
-                        </h2>
-                        <p class="text-xs sm:text-sm text-slate-300">
-                            Cari nomor part, kode sparepart, lokasi addressing, serta mapping mesin dan area secara real-time.
-                        </p>
-                    </div>
-
-                    <!-- Mini KPI Badges -->
-                    <!-- <div class="grid grid-cols-3 gap-2 sm:gap-3 shrink-0">
-                        <div class="bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-3 text-center">
-                            <p class="text-[11px] font-medium text-slate-300 uppercase tracking-wider">Total Part</p>
-                            <p class="text-lg sm:text-xl font-extrabold text-white mt-0.5">{{ totalCount.toLocaleString() }}</p>
-                        </div>
-                        <div class="bg-emerald-500/15 backdrop-blur-sm border border-emerald-500/30 rounded-xl p-3 text-center">
-                            <p class="text-[11px] font-medium text-emerald-300 uppercase tracking-wider">Teraddress</p>
-                            <p class="text-lg sm:text-xl font-extrabold text-emerald-400 mt-0.5">{{ addressedCount.toLocaleString() }}</p>
-                        </div>
-                        <div class="bg-amber-500/15 backdrop-blur-sm border border-amber-500/30 rounded-xl p-3 text-center">
-                            <p class="text-[11px] font-medium text-amber-300 uppercase tracking-wider">Belum Ada</p>
-                            <p class="text-lg sm:text-xl font-extrabold text-amber-400 mt-0.5">{{ unaddressedCount.toLocaleString() }}</p>
-                        </div>
-                    </div> -->
-                </div>
-            </div>
-
             <!-- SEARCH & FILTER CONTROLS (100% Client-side) -->
-            <div class="bg-white p-4 sm:p-5 rounded-xl shadow-xs border border-slate-200 space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-xs border border-slate-200 space-y-3">
                 <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
                     
                     <!-- Search Input (Debounced 300ms) -->
@@ -280,7 +245,7 @@ const resetAllFilters = () => {
                         <select
                             v-model="selectedArea"
                             @change="currentPage = 1"
-                            class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                            class="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
                         >
                             <option value="">Semua Area</option>
                             <option v-for="area in uniqueAreas" :key="area.id" :value="area.id">
@@ -292,7 +257,7 @@ const resetAllFilters = () => {
                         <select
                             v-model.number="perPage"
                             @change="currentPage = 1"
-                            class="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                            class="pl-3 pr-8 py-2 min-w-[118px] bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
                         >
                             <option :value="25">25 baris</option>
                             <option :value="50">50 baris</option>
@@ -328,17 +293,16 @@ const resetAllFilters = () => {
 
             <!-- DATA TABLE -->
             <div class="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
-                <div class="overflow-x-auto">
+                <div class="overflow-auto max-h-[70vh]">
                     <table class="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-700 uppercase font-bold text-[11px] tracking-wider">
+                        <thead class="sticky top-0 z-10">
+                            <tr class="bg-slate-100 border-b border-slate-200 text-slate-700 uppercase font-bold text-[11px] tracking-wider">
                                 <th class="py-3 px-4 w-12 text-center text-slate-400">#</th>
                                 <th class="py-3 px-4 min-w-[160px]">Nomor Sparepart</th>
-                                <th class="py-3 px-4 min-w-[130px]">Kode Sparepart</th>
-                                <th class="py-3 px-4 min-w-[200px]">Nama Sparepart</th>
-                                <th class="py-3 px-4 min-w-[220px]">Addressing</th>
-                                <th class="py-3 px-4 min-w-[160px]">Machine</th>
-                                <th class="py-3 px-4 min-w-[100px]">Area</th>
+                                <th class="py-3 px-4 min-w-[260px]">Nama Sparepart</th>
+                                <th class="py-3 px-4 min-w-[180px]">Addressing</th>
+                                <th class="py-3 px-4 min-w-[200px]">Machine</th>
+                                <th class="py-3 px-4 w-20">Area</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-slate-700">
@@ -358,14 +322,6 @@ const resetAllFilters = () => {
                                         {{ part.pn_baan }}
                                     </td>
 
-                                    <!-- Kode Sparepart -->
-                                    <td class="py-3 px-4 font-mono text-slate-700">
-                                        <span v-if="part.part_number_code" class="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded font-semibold text-slate-800">
-                                            {{ part.part_number_code }}
-                                        </span>
-                                        <span v-else class="text-slate-400">-</span>
-                                    </td>
-
                                     <!-- Nama Sparepart (Description) -->
                                     <td class="py-3 px-4 text-slate-700 font-medium">
                                         {{ part.description || '-' }}
@@ -373,13 +329,14 @@ const resetAllFilters = () => {
 
                                     <!-- Addressing (Lokasi) -->
                                     <td class="py-3 px-4">
-                                        <div v-if="part.addressing && part.addressing.trim()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md font-semibold text-xs">
-                                            <MapPin class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                        <div v-if="part.addressing && part.addressing.trim()" class="inline-flex items-center gap-2 font-semibold text-slate-800">
+                                            <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                                             <span>{{ part.addressing }}</span>
                                         </div>
-                                        <span v-else class="italic text-slate-400 text-xs">
-                                            Belum teraddress
-                                        </span>
+                                        <div v-else class="inline-flex items-center gap-2 text-slate-500">
+                                            <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                                            <span>Belum teraddress</span>
+                                        </div>
                                     </td>
 
                                     <!-- Machine -->
@@ -400,7 +357,7 @@ const resetAllFilters = () => {
 
                             <!-- Empty State -->
                             <tr v-else>
-                                <td colspan="7" class="py-12 text-center text-slate-500">
+                                <td colspan="6" class="py-12 text-center text-slate-500">
                                     <div class="flex flex-col items-center justify-center space-y-2">
                                         <AlertCircle class="w-8 h-8 text-slate-300" />
                                         <p class="font-semibold text-slate-700">Tidak ada data sparepart yang cocok.</p>
