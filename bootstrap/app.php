@@ -34,61 +34,23 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
-        // Capture unhandled exceptions into system_error_logs table and detailed exception-trace.log
+        // Satu error = 1 baris pendek di log file + 1 row (dedup) di system_error_logs.
+        // ->stop() mematikan logging default Laravel yang menulis full stack trace ke file.
         $exceptions->report(function (\Throwable $e) {
             try {
-                $req = app()->bound('request') ? request() : null;
-                $method = $req ? $req->method() : (app()->runningInConsole() ? 'CLI' : 'UNKNOWN');
-
-                $logDir = storage_path('logs');
-                if (!is_dir($logDir)) {
-                    @mkdir($logDir, 0777, true);
-                }
-
-                $traceFrames = array_slice($e->getTrace(), 0, 10);
-                $formattedTrace = [];
-                foreach ($traceFrames as $i => $frame) {
-                    $file = $frame['file'] ?? 'unknown_file';
-                    $line = $frame['line'] ?? 0;
-                    $class = $frame['class'] ?? '';
-                    $type = $frame['type'] ?? '';
-                    $func = $frame['function'] ?? '';
-                    $formattedTrace[] = "  #{$i} {$file}({$line}): {$class}{$type}{$func}()";
-                }
-
-                $entry = sprintf(
-                    "================================================================================\n" .
-                    "TIMESTAMP   : %s\n" .
-                    "METHOD / URL: %s %s\n" .
-                    "PHP RUNTIME : Version: %s (ID: %s) | SAPI: %s | PID: %s\n" .
-                    "BINARY / INI: %s | %s\n" .
-                    "EXCEPTION   : %s\n" .
-                    "MESSAGE     : %s\n" .
-                    "LOCATION    : %s (Line %d)\n" .
-                    "STACK TRACE (First 10 frames):\n%s\n\n",
-                    date('Y-m-d H:i:s T'),
-                    $method,
-                    $req ? $req->fullUrl() : 'N/A',
-                    PHP_VERSION,
-                    PHP_VERSION_ID,
-                    PHP_SAPI,
-                    getmypid(),
-                    defined('PHP_BINARY') ? PHP_BINARY : 'N/A',
-                    php_ini_loaded_file() ?: 'None',
-                    get_class($e),
-                    $e->getMessage(),
-                    $e->getFile(),
-                    $e->getLine(),
-                    implode("\n", $formattedTrace)
-                );
-
-                @file_put_contents($logDir . '/exception-trace.log', $entry, FILE_APPEND | LOCK_EX);
-            } catch (\Throwable $loggingErr) {
-                // Ignore tracing failures to not disrupt error flow
+                \Illuminate\Support\Facades\Log::error(sprintf(
+                    '%s: %s @ %s:%d',
+                    class_basename($e),
+                    \App\Services\SystemErrorLogService::shortMessage($e),
+                    \App\Services\SystemErrorLogService::relativePath($e->getFile()),
+                    $e->getLine()
+                ));
+            } catch (\Throwable) {
+                // jangan ganggu alur error
             }
 
             \App\Services\SystemErrorLogService::captureException($e);
-        });
+        })->stop();
 
         // Global handler untuk exception 429 Too Many Requests
         $exceptions->render(function (ThrottleRequestsException $e, Request $request) {

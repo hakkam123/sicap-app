@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class CleanupLogsCommand extends Command
 {
@@ -34,15 +33,16 @@ class CleanupLogsCommand extends Command
         $chunkSize = 500;
 
         // 1. Cleanup system_error_logs:
-        // - is_resolved = 1 AND resolved_at < 30 days ago
-        // - OR created_at < 90 days ago
+        // - status = resolved AND resolved_at < 7 hari lalu
+        // - ATAU created_at < 30 hari lalu
         $this->comment('Cleaning up obsolete system_error_logs...');
         do {
             $ids = DB::table('system_error_logs')
                 ->where(function ($query) {
-                    $query->where('is_resolved', 1)
-                          ->where('resolved_at', '<', now()->subDays(30))
-                          ->orWhere('created_at', '<', now()->subDays(90));
+                    $query->where(function ($q) {
+                        $q->where('status', 'resolved')
+                          ->where('resolved_at', '<', now()->subDays(7));
+                    })->orWhere('created_at', '<', now()->subDays(30));
                 })
                 ->limit($chunkSize)
                 ->pluck('id');
@@ -72,15 +72,22 @@ class CleanupLogsCommand extends Command
             $deletedImportLogs += $count;
         } while ($count > 0);
 
-        $summary = "Log cleanup finished. Deleted {$deletedErrorLogs} system_error_logs and {$deletedImportLogs} import_logs.";
-        $this->info($summary);
-
-        // Log hasil cleanup ke daily logger
-        try {
-            Log::channel('daily')->info("[Database Maintenance] {$summary}");
-        } catch (\Throwable $e) {
-            Log::info("[Database Maintenance] {$summary}");
+        // 3. Hapus file log lama: format per-hari (sebelum rotasi bulanan) & exception-trace.log
+        $deletedFiles = 0;
+        $logDir = storage_path('logs');
+        $legacy = array_merge(
+            glob($logDir . '/laravel-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].log') ?: [],
+            glob($logDir . '/security-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].log') ?: [],
+            glob($logDir . '/exception-trace.log') ?: [],
+        );
+        foreach ($legacy as $file) {
+            if (@unlink($file)) {
+                $deletedFiles++;
+            }
         }
+
+        $summary = "Log cleanup finished. Deleted {$deletedErrorLogs} system_error_logs and {$deletedImportLogs} import_logs, {$deletedFiles} file log lama.";
+        $this->info($summary);
 
         return Command::SUCCESS;
     }

@@ -59,12 +59,13 @@ return [
             'ignore_exceptions' => false,
         ],
 
-        // Channel khusus audit & monitoring keamanan (retensi 30 hari)
+        // Channel khusus audit & monitoring keamanan (1 file per bulan, simpan 3 bulan)
         'security' => [
             'driver' => 'daily',
             'path' => storage_path('logs/security.log'),
             'level' => 'warning',
-            'max_files' => 30,
+            'max_files' => 3,
+            'tap' => [App\Logging\MonthlyFileName::class],
             'replace_placeholders' => true,
         ],
 
@@ -75,19 +76,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Rotasi PER BULAN (laravel-2026-11.log), bukan per hari. Simpan 2 file (bulan ini + bulan lalu).
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'warning'),
-            'max_files' => env('LOG_DAILY_DAYS', 14),
-            'replace_placeholders' => true,
-        ],
-
-        'monthly' => [
-            'driver' => 'monthly',
-            'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'warning'),
-            'max_files' => 3,
+            'max_files' => env('LOG_MAX_MONTHS', 2),
+            'tap' => [App\Logging\MonthlyFileName::class],
             'replace_placeholders' => true,
         ],
 

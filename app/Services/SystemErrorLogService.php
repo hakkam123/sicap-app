@@ -11,62 +11,114 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class SystemErrorLogService
 {
+    /** Batas ukuran agar tabel tidak membengkak. */
+    private const MAX_MESSAGE = 300;
+    private const MAX_TRACE_FRAMES = 5;
+    private const MAX_PAYLOAD = 2000;
+    private const DEDUP_HOURS = 24;
+
     /**
      * Capture and store an exception as a system error log.
+     * - Hanya error server (5xx); 4xx adalah perilaku user biasa, bukan error aplikasi.
+     * - Error yang sama (class + file + line) yang masih unresolved dalam 24 jam
+     *   tidak dibuat row baru, hanya updated_at yang diperbarui.
      */
     public static function captureException(\Throwable $e, ?Request $request = null, array $additionalContext = []): ?SystemErrorLog
     {
         try {
-            $req = $request ?: (app()->bound('request') ? request() : null);
-
             $statusCode = self::determineStatusCode($e);
-            $severity = self::determineSeverity($statusCode, $e);
-            $feature = self::determineFeature($req, $additionalContext);
-            $errorType = self::determineErrorType($statusCode, $e);
+            if ($statusCode < 500) {
+                return null;
+            }
+
+            $file = self::relativePath($e->getFile());
+
+            $existing = SystemErrorLog::query()
+                ->where('status', 'unresolved')
+                ->where('exception_class', get_class($e))
+                ->where('file', $file)
+                ->where('line', $e->getLine())
+                ->where('created_at', '>=', now()->subHours(self::DEDUP_HOURS))
+                ->first();
+
+            if ($existing) {
+                $existing->touch();
+                return $existing;
+            }
+
+            $req = $request ?: (app()->bound('request') && !app()->runningInConsole() ? request() : null);
 
             $payload = null;
             if ($req) {
-                $allInputs = $req->except(['password', 'password_confirmation', '_token', 'token', 'secret', 'authorization']);
-                $payload = json_encode([
-                    'headers' => [
-                        'user-agent' => $req->userAgent(),
-                        'accept' => $req->header('Accept'),
-                        'content-type' => $req->header('Content-Type'),
-                    ],
+                $data = array_filter([
                     'query' => $req->query(),
-                    'body' => $allInputs,
+                    'body' => $req->except(['password', 'password_confirmation', '_token', 'token', 'secret', 'authorization', 'file']),
                     'context' => $additionalContext,
-                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                ]);
+                $payload = $data ? Str::limit(json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), self::MAX_PAYLOAD) : null;
             }
 
-            // Truncate stack trace to reasonable size (max 8000 chars)
-            $stackTrace = Str::limit($e->getTraceAsString(), 8000);
-
             return SystemErrorLog::create([
-                'error_type' => $errorType,
+                'error_type' => self::determineErrorType($statusCode, $e),
                 'status_code' => $statusCode,
-                'severity' => $severity,
-                'feature' => $feature,
-                'message' => Str::limit($e->getMessage() ?: (get_class($e) . ' occurred'), 1000),
+                'severity' => self::determineSeverity($statusCode, $e),
+                'feature' => self::determineFeature($req, $additionalContext),
+                'message' => self::shortMessage($e),
                 'exception_class' => get_class($e),
-                'file' => $e->getFile(),
+                'file' => $file,
                 'line' => $e->getLine(),
-                'url' => $req ? $req->fullUrl() : null,
+                'url' => $req ? Str::limit($req->fullUrl(), 500) : null,
                 'method' => $req ? $req->method() : (app()->runningInConsole() ? 'CLI' : null),
                 'request_payload' => $payload,
-                'stack_trace' => $stackTrace,
+                'stack_trace' => self::shortTrace($e),
                 'user_id' => Auth::id(),
-                'user_ip' => $req ? $req->ip() : null,
-                'user_agent' => $req ? $req->userAgent() : null,
+                'user_ip' => $req?->ip(),
+                'user_agent' => $req ? Str::limit((string) $req->userAgent(), 255) : null,
                 'status' => 'unresolved',
             ]);
         } catch (\Throwable $loggingException) {
-            // Safety: Fallback to standard Laravel log if logging to DB fails
-            Log::error("Failed to store SystemErrorLog in database: " . $loggingException->getMessage(), [
-                'original_exception' => $e->getMessage(),
-            ]);
+            Log::error('Failed to store SystemErrorLog: ' . Str::limit($loggingException->getMessage(), 200));
             return null;
         }
+    }
+
+    /**
+     * Pesan error ringkas: buang prefix driver ODBC & bagian "(Connection: ..., SQL: ...)".
+     */
+    public static function shortMessage(\Throwable $e): string
+    {
+        $msg = $e->getMessage() ?: (class_basename($e) . ' occurred');
+        $msg = preg_replace('/(\[Microsoft\]|\[ODBC Driver [^\]]*\]|\[SQL Server\])/', '', $msg);
+        $msg = preg_replace('/\s*\(Connection: .*$/s', '', $msg);
+        $msg = preg_split('/\R/', trim($msg))[0];
+
+        return Str::limit(trim(preg_replace('/\s+/', ' ', $msg)), self::MAX_MESSAGE);
+    }
+
+    /**
+     * Stack trace ringkas: hanya beberapa frame teratas, path relatif.
+     */
+    public static function shortTrace(\Throwable $e): string
+    {
+        $lines = [];
+        foreach (array_slice($e->getTrace(), 0, self::MAX_TRACE_FRAMES) as $i => $f) {
+            $lines[] = sprintf(
+                '#%d %s(%s): %s%s%s()',
+                $i,
+                self::relativePath($f['file'] ?? '?'),
+                $f['line'] ?? '?',
+                $f['class'] ?? '',
+                $f['type'] ?? '',
+                $f['function'] ?? ''
+            );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public static function relativePath(string $path): string
+    {
+        return ltrim(str_replace([base_path(), '\\'], ['', '/'], $path), '/');
     }
 
     /**
