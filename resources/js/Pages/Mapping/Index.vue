@@ -8,7 +8,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import { Search, RotateCcw, Download, Upload, AlertCircle, X } from 'lucide-vue-next';
+import { Search, RotateCcw, Download, Upload, AlertCircle, X, Plus } from 'lucide-vue-next';
 
 const page = usePage();
 
@@ -319,6 +319,62 @@ const isAllMachinesInAreaSelected = (area) => {
     );
 };
 
+// ==========================================
+// MODAL TAMBAH MANUAL (PART PICKER)
+// ==========================================
+const showManualPicker = ref(false);
+const manualSearch = ref('');
+const manualResults = ref([]);
+const isSearchingParts = ref(false);
+let manualSearchTimer = null;
+
+const fetchManualParts = async () => {
+    isSearchingParts.value = true;
+
+    try {
+        const res = await fetch(
+            route('mapping.parts-search', { q: manualSearch.value }),
+            {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }
+        );
+
+        const data = await res.json();
+        manualResults.value = data.parts || [];
+    } catch (e) {
+        console.error('Gagal mencari part:', e);
+        manualResults.value = [];
+    } finally {
+        isSearchingParts.value = false;
+    }
+};
+
+const onManualSearchInput = () => {
+    clearTimeout(manualSearchTimer);
+    manualSearchTimer = setTimeout(fetchManualParts, 300);
+};
+
+const openManualPicker = () => {
+    manualSearch.value = '';
+    manualResults.value = [];
+    showManualPicker.value = true;
+    fetchManualParts();
+};
+
+const closeManualPicker = () => {
+    showManualPicker.value = false;
+    manualSearch.value = '';
+    manualResults.value = [];
+};
+
+const chooseManualPart = (part) => {
+    closeManualPicker();
+    openAssignModal(part);
+};
+
 const saveMapping = () => {
     if (!selectedPart.value) {
         return;
@@ -580,6 +636,18 @@ const submitImportForm = () => {
                             </a>
 
 
+                            <!-- Tambah Manual -->
+                            <button
+                                v-if="isAdmin"
+                                type="button"
+                                @click="openManualPicker"
+                                class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition"
+                            >
+                                <Plus class="w-3.5 h-3.5 text-white" />
+                                Tambah Manual
+                            </button>
+
+
                             <!-- Import Excel -->
                             <button
                                 v-if="isAdmin"
@@ -792,6 +860,18 @@ const submitImportForm = () => {
                                 <Download class="w-3.5 h-3.5 text-gray-600" />
                                 Template
                             </a>
+
+
+                            <!-- Tambah Manual -->
+                            <button
+                                v-if="isAdmin"
+                                type="button"
+                                @click="openManualPicker"
+                                class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition"
+                            >
+                                <Plus class="w-3.5 h-3.5 text-white" />
+                                Tambah Manual
+                            </button>
 
 
                             <!-- Import Excel -->
@@ -1169,6 +1249,97 @@ const submitImportForm = () => {
 
             </div>
 
+        </Modal>
+
+
+        <!-- ======================================================= -->
+        <!-- MODAL TAMBAH MANUAL (PILIH PART)                        -->
+        <!-- ======================================================= -->
+        <Modal
+            :show="showManualPicker"
+            @close="closeManualPicker"
+            max-width="lg"
+        >
+            <div class="p-6 sm:p-7 space-y-5">
+
+                <!-- Header -->
+                <div class="flex items-start justify-between pb-3 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">
+                            Tambah Mapping Manual
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Pilih part number terlebih dahulu, lalu atur area &amp; mesin-nya.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        @click="closeManualPicker"
+                        class="text-slate-400 hover:text-slate-600 p-1"
+                    >
+                        <X class="w-5 h-5" />
+                    </button>
+                </div>
+
+                <!-- Search Part -->
+                <div class="relative">
+                    <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                        v-model="manualSearch"
+                        @input="onManualSearchInput"
+                        type="text"
+                        placeholder="Cari PN BAAN atau deskripsi..."
+                        class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        autofocus
+                    />
+                </div>
+
+                <!-- Results -->
+                <div class="max-h-72 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-100">
+
+                    <div
+                        v-if="isSearchingParts"
+                        class="py-10 text-center text-xs text-slate-400 animate-pulse"
+                    >
+                        Mencari part...
+                    </div>
+
+                    <div
+                        v-else-if="manualResults.length === 0"
+                        class="py-10 text-center text-xs text-slate-400"
+                    >
+                        Tidak ada part number ditemukan.
+                    </div>
+
+                    <button
+                        v-else
+                        v-for="part in manualResults"
+                        :key="part.id"
+                        type="button"
+                        @click="chooseManualPart(part)"
+                        class="w-full text-left px-4 py-3 hover:bg-blue-50/70 transition flex items-center justify-between gap-3"
+                    >
+                        <div class="min-w-0">
+                            <p class="font-mono font-bold text-xs text-slate-800">
+                                {{ part.pn_baan }}
+                            </p>
+                            <p class="text-xs text-slate-500 truncate">
+                                {{ part.description || 'Tanpa Deskripsi' }}
+                            </p>
+                        </div>
+                        <span class="shrink-0 text-[11px] font-semibold text-blue-600">
+                            Pilih →
+                        </span>
+                    </button>
+
+                </div>
+
+                <p class="text-[11px] text-slate-400">
+                    Menampilkan maksimal 20 hasil. Persempit pencarian bila part tidak muncul.
+                </p>
+
+            </div>
         </Modal>
 
 

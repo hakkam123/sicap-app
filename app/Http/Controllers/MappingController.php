@@ -93,6 +93,28 @@ class MappingController extends Controller
     }
 
     /**
+     * Search part numbers for the manual mapping picker (JSON, limited).
+     */
+    public function searchParts(Request $request): JsonResponse
+    {
+        $search = trim((string) $request->input('q', ''));
+
+        $parts = PartNumber::query()
+            ->whereNull('deleted_at')
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($q2) use ($search) {
+                    $q2->where('pn_baan', 'like', "%{$search}%")
+                       ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('pn_baan')
+            ->take(20)
+            ->get(['id', 'pn_baan', 'description']);
+
+        return response()->json(['parts' => $parts]);
+    }
+
+    /**
      * Get the mapped area_ids and machine_ids for a specific part number.
      */
     public function getPartDetail(PartNumber $partNumber): JsonResponse

@@ -84,6 +84,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
     // Mapping Part <-> Area & Machine (Unified)
     Route::get('/mapping', [MappingController::class, 'index'])->name('mapping.index');
+    Route::get('/mapping/parts/search', [MappingController::class, 'searchParts'])->name('mapping.parts-search');
     Route::get('/mapping/{partNumber}/detail', [MappingController::class, 'getPartDetail'])->name('mapping.detail');
     Route::post('/mapping/sync', [MappingController::class, 'sync'])->name('mapping.sync');
     Route::post('/mapping/import', [MappingController::class, 'importMapping'])->name('mapping.import');

@@ -208,7 +208,7 @@ const parsedErrors = computed(() => {
 
 const handleDownloadErrorExcel = (log) => {
     if (!log) return;
-    const url = route('error-monitoring.download-errors', log.id);
+    const url = route('import-logs.download-errors', log.id);
     const filename = `laporan_error_${log.feature || 'import'}_${log.id.substring(0, 8)}.xlsx`;
     download({
         url,
