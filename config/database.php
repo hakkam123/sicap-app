@@ -103,7 +103,8 @@ return [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', 'localhost'),
-            'port' => env('DB_PORT', '1433'),
+            // Kosongkan DB_PORT di .env untuk named instance / port dinamis (port tidak ditambahkan ke DSN)
+            'port' => env('DB_PORT'),
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
