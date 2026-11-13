@@ -3,12 +3,11 @@
 namespace App\Imports;
 
 use App\Models\Area;
-use App\Models\Consume;
 use App\Models\PartNumber;
+use App\Support\ConsumeUpserter;
 use App\Support\IndonesianFormatParser;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
@@ -18,6 +17,8 @@ class ConsumeImport implements ToArray, WithHeadingRow
     public int $successCount = 0;
     public int $errorCount = 0;
     public array $errors = [];
+    public int $insertedCount = 0;
+    public int $updatedCount = 0;
 
     /**
      * @param array $array
@@ -28,6 +29,8 @@ class ConsumeImport implements ToArray, WithHeadingRow
         $userId = Auth::id();
 
         DB::transaction(function () use ($array, $userId) {
+            $records = [];
+
             foreach ($array as $index => $row) {
                 $rowNumber = $index + 2;
 
@@ -152,9 +155,8 @@ class ConsumeImport implements ToArray, WithHeadingRow
                 }
                 $mappedMachineId = $partNumber->machines->first()?->id;
 
-                // Simpan transaksi consume dengan area & machine dari mapping
-                Consume::create([
-                    'id' => (string) Str::ulid(),
+                // Kumpulkan dulu; disimpan sekaligus tanpa dobel di akhir
+                $records[] = [
                     'part_number_id' => $partNumber->id,
                     'area_id' => $mappedAreaId,
                     'machine_id' => $mappedMachineId,
@@ -163,10 +165,15 @@ class ConsumeImport implements ToArray, WithHeadingRow
                     'consumed_at' => $consumedAt,
                     'source' => 'import_excel',
                     'created_by' => $userId,
-                ]);
+                ];
 
                 $this->successCount++;
             }
+
+            // Transaksi yang sudah ada (dari sync API / import sebelumnya) diperbarui, bukan dobel
+            $saved = ConsumeUpserter::upsertLatest($records);
+            $this->insertedCount = $saved['inserted'];
+            $this->updatedCount = $saved['updated'];
         });
     }
 

@@ -26,8 +26,8 @@ class SyncApiJob implements ShouldQueue
 
     public function handle(ConsumeSyncService $syncService): void
     {
-        $dateFrom = $this->dateFrom ?: now()->subDay()->format('Y-m-d');
-        $dateTo = $this->dateTo ?: now()->format('Y-m-d');
+        $dateFrom = $this->dateFrom ?: now('Asia/Jakarta')->subDay()->format('Y-m-d');
+        $dateTo = $this->dateTo ?: now('Asia/Jakarta')->format('Y-m-d');
 
         $importLog = ImportLog::create([
             'feature' => 'sync_api',

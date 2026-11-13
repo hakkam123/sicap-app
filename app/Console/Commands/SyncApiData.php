@@ -18,8 +18,8 @@ class SyncApiData extends Command
     public function handle(ConsumeSyncService $syncService): int
     {
         $startTime = now();
-        $dateFrom = $this->option('date-from') ?: now()->subDay()->format('Y-m-d');
-        $dateTo = $this->option('date-to') ?: now()->format('Y-m-d');
+        $dateFrom = $this->option('date-from') ?: now('Asia/Jakarta')->subDay()->format('Y-m-d');
+        $dateTo = $this->option('date-to') ?: now('Asia/Jakarta')->format('Y-m-d');
 
         $this->info('====================================================');
         $this->info(' SICAP API Synchronization');

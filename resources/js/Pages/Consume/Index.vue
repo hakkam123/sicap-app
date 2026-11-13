@@ -25,6 +25,12 @@ import {
     Info
 } from 'lucide-vue-next';
 
+// Tanggal lokal (WIB), bukan UTC dari toISOString()
+const todayLocal = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const props = defineProps({
     consumes: {
         type: Object,
@@ -227,7 +233,7 @@ const manualForm = useForm({
     part_number_id: '',
     quantity: 1,
     amount: '',
-    consumed_at: new Date().toISOString().split('T')[0],
+    consumed_at: todayLocal(),
 });
 
 const filteredPartNumbers = computed(() => {
@@ -255,7 +261,7 @@ const openManualModal = () => {
     manualForm.clearErrors();
     manualForm.quantity = 1;
     manualForm.amount = '';
-    manualForm.consumed_at = new Date().toISOString().split('T')[0];
+    manualForm.consumed_at = todayLocal();
     manualSearchQuery.value = '';
     isManualModalOpen.value = true;
 };
@@ -266,7 +272,7 @@ const openEditModal = (item) => {
     manualForm.part_number_id = item.part_number_id;
     manualForm.quantity = Math.abs(Number(item.quantity)) || 1;
     manualForm.amount = item.amount !== null && item.amount !== undefined ? Math.abs(Number(item.amount)) : '';
-    manualForm.consumed_at = item.consumed_at ? item.consumed_at.split('T')[0] : new Date().toISOString().split('T')[0];
+    manualForm.consumed_at = item.consumed_at ? item.consumed_at.split('T')[0] : todayLocal();
 
     const part = props.partNumbers.find(p => p.id === item.part_number_id) || item.part_number;
     if (part) {
@@ -385,12 +391,12 @@ const showAdvancedSettings = ref(false);
 
 const scheduleList = ref([]);
 const newScheduleTime = ref('');
-const syncDateFrom = ref(new Date().toISOString().split('T')[0]);
-const syncDateTo = ref(new Date().toISOString().split('T')[0]);
+const syncDateFrom = ref(todayLocal());
+const syncDateTo = ref(todayLocal());
 
 const openApiModal = () => {
-    syncDateFrom.value = new Date().toISOString().split('T')[0];
-    syncDateTo.value = new Date().toISOString().split('T')[0];
+    syncDateFrom.value = todayLocal();
+    syncDateTo.value = todayLocal();
     scheduleList.value = (props.syncSchedules && props.syncSchedules.length > 0)
         ? props.syncSchedules.map(s => ({
             id: s.id,

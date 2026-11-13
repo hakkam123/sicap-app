@@ -6,6 +6,7 @@ use App\Models\Area;
 use App\Models\Consume;
 use App\Models\Machine;
 use App\Models\PartNumber;
+use App\Support\ConsumeUpserter;
 use App\Support\IndonesianFormatParser;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -58,15 +59,25 @@ class ConsumeSyncService
                     ];
                 }
 
-                $dateFrom = $dateFrom ?: now()->subDay()->format('Y-m-d');
-                $dateTo = $dateTo ?: now()->format('Y-m-d');
+                // Tanggal bisnis mengikuti WIB, bukan timezone aplikasi (UTC)
+                $tz = config('services.external_api.timezone', 'Asia/Jakarta');
+                $dateFrom = $dateFrom ?: now($tz)->subDay()->format('Y-m-d');
+                $dateTo = $dateTo ?: now($tz)->format('Y-m-d');
+
+                if ($dateFrom > $dateTo) {
+                    [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+                }
+
+                // Antisipasi API yang memperlakukan dateTo sebagai "Y-m-d 00:00:00" (transaksi
+                // di hari dateTo tidak ikut). Kirim dateTo + 1 hari, lalu saring lokal ke rentang asli.
+                $apiDateTo = Carbon::parse($dateTo)->addDay()->format('Y-m-d');
 
                 $response = Http::timeout($timeout)
                     ->withBasicAuth($username, $password)
                     ->acceptJson()
                     ->get("{$baseUrl}/api/GetAdjustmentData", [
                         'dateFrom' => $dateFrom,
-                        'dateTo' => $dateTo,
+                        'dateTo' => $apiDateTo,
                     ]);
 
                 if (!$response->successful()) {
@@ -84,7 +95,14 @@ class ConsumeSyncService
                     );
                 }
 
-                $apiData = $payload['Data'] ?? [];
+                $apiData = array_values(array_filter(
+                    $payload['Data'] ?? [],
+                    function ($row) use ($dateFrom, $dateTo) {
+                        $d = substr((string) ($row['TransactionDate'] ?? ''), 0, 10);
+
+                        return $d === '' || ($d >= $dateFrom && $d <= $dateTo);
+                    }
+                ));
                 $totalFromApi = count($apiData);
 
                 if (empty($apiData)) {
@@ -109,11 +127,6 @@ class ConsumeSyncService
                     'qty' => (int) ($row['Qty'] ?? 0),
                     'amount' => $row['Amount'] ?? 0,
                 ])->all();
-
-                // Deduplicate against existing database records
-                $beforeDedup = count($items);
-                $items = $this->deduplicateApiItems($items);
-                $skippedCount = $beforeDedup - count($items);
             }
 
             if (empty($items)) {
@@ -132,21 +145,23 @@ class ConsumeSyncService
                 ];
             }
 
-            $result = $this->processItems($items, $userId);
+            // Sync BAAN: baris valid tetap disimpan walau ada PN yang belum terdaftar di master
+            $result = $this->processItems($items, $userId, partial: true);
 
             $endTime = now();
             $duration = $endTime->diffInSeconds($startTime);
-            $syncedCount = $result['processed'] ?? 0;
+            $syncedCount = $result['inserted'] ?? 0;
+            $skippedCount = $result['updated'] ?? 0;
             $hasErrors = !empty($result['errors']);
 
             Cache::forever('last_api_sync_at', $endTime->toIso8601String());
 
             $messageParts = [];
             if ($syncedCount > 0) {
-                $messageParts[] = "{$syncedCount} data berhasil disinkronkan";
+                $messageParts[] = "{$syncedCount} data baru disinkronkan";
             }
             if ($skippedCount > 0) {
-                $messageParts[] = "{$skippedCount} data sudah ada (dilewati)";
+                $messageParts[] = "{$skippedCount} data sudah ada (diperbarui, tidak dobel)";
             }
             if ($hasErrors) {
                 $messageParts[] = count($result['errors']) . ' data gagal validasi';
@@ -156,7 +171,7 @@ class ConsumeSyncService
             }
 
             $status = 'success';
-            if ($hasErrors && $syncedCount === 0) {
+            if ($hasErrors && $syncedCount + $skippedCount === 0) {
                 $status = 'error';
             } elseif ($hasErrors) {
                 $status = 'partial';
@@ -194,69 +209,14 @@ class ConsumeSyncService
     }
 
     /**
-     * Deduplicate incoming API items against existing database records.
-     * Uses fingerprint (pn_baan + date + qty + amount) to detect duplicates.
-     */
-    private function deduplicateApiItems(array $items): array
-    {
-        if (empty($items)) {
-            return [];
-        }
-
-        $parsedDates = [];
-        foreach ($items as $item) {
-            $d = IndonesianFormatParser::parseDate($item['date'] ?? null);
-            if ($d) {
-                $parsedDates[] = $d;
-            }
-        }
-
-        if (empty($parsedDates)) {
-            return $items;
-        }
-
-        $minDate = min($parsedDates)->copy()->startOfDay();
-        $maxDate = max($parsedDates)->copy()->endOfDay();
-
-        $existing = DB::table('consumes')
-            ->join('part_numbers', 'part_numbers.id', '=', 'consumes.part_number_id')
-            ->where('consumes.source', 'api')
-            ->whereBetween('consumes.consumed_at', [$minDate, $maxDate])
-            ->select('part_numbers.pn_baan', 'consumes.consumed_at', 'consumes.quantity', 'consumes.amount')
-            ->get();
-
-        if ($existing->isEmpty()) {
-            return $items;
-        }
-
-        $existingFps = [];
-        foreach ($existing as $r) {
-            $fp = strtoupper(trim($r->pn_baan))
-                . '|' . Carbon::parse($r->consumed_at)->format('Y-m-d')
-                . '|' . (int) $r->quantity
-                . '|' . sprintf('%.2f', (float) $r->amount);
-            $existingFps[$fp] = true;
-        }
-
-        return array_values(array_filter($items, function ($item) use ($existingFps) {
-            $date = IndonesianFormatParser::parseDate($item['date'] ?? null);
-            $fp = strtoupper(trim($item['part_number'] ?? ''))
-                . '|' . ($date ? $date->format('Y-m-d') : '')
-                . '|' . (int) ($item['qty'] ?? 0)
-                . '|' . sprintf('%.2f', (float) ($item['amount'] ?? 0));
-
-            return !isset($existingFps[$fp]);
-        }));
-    }
-
-    /**
      * Validate and bulk insert consume records into database.
      *
      * @param array $items
      * @param string|null $userId
+     * @param bool $partial true = simpan baris valid & laporkan baris gagal; false = semua-atau-tidak-sama-sekali
      * @return array
      */
-    public function processItems(array $items, ?string $userId = null): array
+    public function processItems(array $items, ?string $userId = null, bool $partial = false): array
     {
         if (empty($items)) {
             return ['total' => 0, 'processed' => 0, 'errors' => []];
@@ -264,7 +224,6 @@ class ConsumeSyncService
 
         $businessErrors = [];
         $recordsToInsert = [];
-        $now = now();
 
         // 1. Bulk Pre-fetch master data to prevent N+1 queries
         $pnCodes = collect($items)
@@ -300,6 +259,7 @@ class ConsumeSyncService
         // 2. Validate items against master data
         foreach ($items as $index => $item) {
             $rowNum = $index + 1;
+            $errorsBeforeRow = count($businessErrors);
             $pnCode = trim((string) ($item['part_number'] ?? $item['pn_baan'] ?? ''));
             $rawDate = $item['date'] ?? $item['consumed_at'] ?? null;
             $rawQty = $item['qty'] ?? $item['quantity'] ?? null;
@@ -405,7 +365,8 @@ class ConsumeSyncService
                 ];
             }
 
-            if (!empty($businessErrors)) {
+            // Lewati hanya baris ini jika baris ini punya error
+            if (count($businessErrors) > $errorsBeforeRow) {
                 continue;
             }
 
@@ -413,7 +374,6 @@ class ConsumeSyncService
             $finalMachineId = $machine?->id ?? $part->machines->first()?->id ?? null;
 
             $recordsToInsert[] = [
-                'id' => (string) Str::ulid(),
                 'part_number_id' => $part->id,
                 'area_id' => $finalAreaId,
                 'machine_id' => $finalMachineId,
@@ -422,30 +382,28 @@ class ConsumeSyncService
                 'consumed_at' => $consumedAt,
                 'source' => 'api',
                 'created_by' => $userId,
-                'created_at' => $now,
-                'updated_at' => $now,
             ];
         }
 
-        if (!empty($businessErrors)) {
+        if (!empty($businessErrors) && (!$partial || empty($recordsToInsert))) {
             return [
                 'total' => count($items),
                 'processed' => 0,
+                'inserted' => 0,
+                'updated' => 0,
                 'errors' => $businessErrors,
             ];
         }
 
-        // 3. Database bulk transaction in chunks
-        DB::transaction(function () use ($recordsToInsert) {
-            foreach (array_chunk($recordsToInsert, 100) as $chunk) {
-                Consume::insert($chunk);
-            }
-        });
+        // 3. Simpan tanpa dobel lintas sumber (import Excel / API / manual); data terbaru menang
+        $saved = ConsumeUpserter::upsertLatest($recordsToInsert);
 
         return [
             'total' => count($items),
-            'processed' => count($recordsToInsert),
-            'errors' => [],
+            'processed' => $saved['inserted'] + $saved['updated'],
+            'inserted' => $saved['inserted'],
+            'updated' => $saved['updated'],
+            'errors' => $businessErrors,
         ];
     }
 }

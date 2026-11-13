@@ -6,6 +6,7 @@ use App\Imports\ConsumeImport;
 use App\Models\Consume;
 use App\Models\ImportLog;
 use App\Models\PartNumber;
+use App\Support\ConsumeUpserter;
 use App\Support\IndonesianFormatParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -64,6 +65,7 @@ class ImportConsumeJob implements ShouldQueue
 
             DB::transaction(function () use ($rows, &$errors, &$processedCount) {
                 $partCache = [];
+                $records = [];
 
                 foreach ($rows as $index => $row) {
                     $rowNumber = $index + 2; // +1 for 0-index, +1 for header row
@@ -134,7 +136,7 @@ class ImportConsumeJob implements ShouldQueue
                     $mappedAreaId = $part->areas->first()?->id;
                     $mappedMachineId = $part->machines->first()?->id;
 
-                    Consume::create([
+                    $records[] = [
                         'part_number_id' => $part->id,
                         'area_id' => $mappedAreaId,
                         'machine_id' => $mappedMachineId,
@@ -143,7 +145,7 @@ class ImportConsumeJob implements ShouldQueue
                         'consumed_at' => $consumedAt,
                         'source' => 'import_excel',
                         'created_by' => $this->userId,
-                    ]);
+                    ];
 
                     $processedCount++;
                 }
@@ -151,6 +153,9 @@ class ImportConsumeJob implements ShouldQueue
                 if (!empty($errors)) {
                     throw new \Exception("Validasi import gagal dengan " . count($errors) . " kesalahan.");
                 }
+
+                // Transaksi yang sudah ada (dari sync API / import sebelumnya) diperbarui, bukan dobel
+                ConsumeUpserter::upsertLatest($records);
             });
 
             if ($importLog) {
