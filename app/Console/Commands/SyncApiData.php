@@ -55,16 +55,17 @@ class SyncApiData extends Command
             $importLog->update([
                 'status' => $status,
                 'total_rows' => $result['total'] ?? 0,
-                'processed_rows' => $syncedCount,
-                'success_rows' => $syncedCount,
+                'processed_rows' => $syncedCount + $skippedCount + count($errors),
+                'success_rows' => $syncedCount + $skippedCount,
+                'updated_rows' => $skippedCount,
                 'failed_rows' => count($errors),
                 'error_message' => !empty($errors) ? json_encode(array_slice($errors, 0, 50), JSON_UNESCAPED_UNICODE) : null,
                 'finished_at' => now(),
             ]);
 
-            $this->info("Synced: {$syncedCount} records");
+            $this->info("New: {$syncedCount} records");
             if ($skippedCount > 0) {
-                $this->info("Skipped (duplicate): {$skippedCount} records");
+                $this->info("Updated (already existed): {$skippedCount} records");
             }
             if (!empty($errors)) {
                 $this->warn("Validation errors: " . count($errors) . " records");

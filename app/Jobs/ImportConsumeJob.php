@@ -46,6 +46,7 @@ class ImportConsumeJob implements ShouldQueue
         $fullPath = Storage::path($this->filePath);
         $errors = [];
         $processedCount = 0;
+        $updatedCount = 0;
 
         try {
             if (!file_exists($fullPath)) {
@@ -63,7 +64,7 @@ class ImportConsumeJob implements ShouldQueue
                 $importLog->update(['total_rows' => count($rows)]);
             }
 
-            DB::transaction(function () use ($rows, &$errors, &$processedCount) {
+            DB::transaction(function () use ($rows, &$errors, &$processedCount, &$updatedCount) {
                 $partCache = [];
                 $records = [];
 
@@ -155,13 +156,15 @@ class ImportConsumeJob implements ShouldQueue
                 }
 
                 // Transaksi yang sudah ada (dari sync API / import sebelumnya) diperbarui, bukan dobel
-                ConsumeUpserter::upsertLatest($records);
+                $updatedCount = ConsumeUpserter::upsertLatest($records)['updated'];
             });
 
             if ($importLog) {
                 $importLog->update([
                     'status' => 'success',
                     'processed_rows' => $processedCount,
+                    'success_rows' => $processedCount,
+                    'updated_rows' => $updatedCount,
                     'error_message' => null,
                 ]);
             }

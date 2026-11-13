@@ -513,9 +513,17 @@ const handleDownloadErrorExcel = (log) => {
                                 <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                                     Hasil Baris
                                 </span>
-                                <p class="text-xs font-bold mt-1">
-                                    <span class="text-emerald-700">{{ selectedLog.success_rows }} sukses</span> / 
+                                <p v-if="selectedLog.updated_rows > 0" class="text-xs font-bold mt-1">
+                                    <span class="text-emerald-700">{{ (selectedLog.success_rows || 0) - selectedLog.updated_rows }} baru</span>,
+                                    <span class="text-blue-700">{{ selectedLog.updated_rows }} diperbarui</span> /
+                                    <span class="text-red-700">{{ selectedLog.failed_rows || 0 }} gagal</span>
+                                </p>
+                                <p v-else class="text-xs font-bold mt-1">
+                                    <span class="text-emerald-700">{{ selectedLog.success_rows }} sukses</span> /
                                     <span class="text-red-700">{{ selectedLog.failed_rows }} gagal</span>
+                                </p>
+                                <p v-if="selectedLog.updated_rows > 0" class="text-[10px] text-slate-500 mt-0.5">
+                                    Diperbarui = sudah ada sebelumnya, ditimpa data terbaru (tidak dobel)
                                 </p>
                             </div>
                         </div>

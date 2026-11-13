@@ -149,6 +149,7 @@ class ImportService
             'total_rows' => $total,
             'processed_rows' => $successCount + $errorCount,
             'success_rows' => $successCount,
+            'updated_rows' => property_exists($importer, 'updatedCount') ? $importer->updatedCount : 0,
             'failed_rows' => $errorCount,
             'error_message' => $errorCount > 0 ? $summaryMsg : null,
             'error_details' => $storedErrors,
