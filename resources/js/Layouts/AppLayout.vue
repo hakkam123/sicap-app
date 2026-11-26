@@ -218,8 +218,9 @@ const logout = () => {
                     <span>Laporan</span>
                 </Link>
 
-                <!-- Riwayat Import -->
+                <!-- Riwayat Import (admin only) -->
                 <Link
+                    v-if="isAdmin"
                     :href="route('import-logs.index')"
                     :class="[
                         'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all',

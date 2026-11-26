@@ -77,6 +77,7 @@ const submit = () => {
                         Download Template Excel
                     </a>
                     <Link
+                        v-if="page.props.auth?.user?.role === 'admin'"
                         :href="route('import-logs.index')"
                         class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-xs font-medium transition-colors"
                     >
